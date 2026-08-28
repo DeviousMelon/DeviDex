@@ -1,0 +1,19 @@
+# Installed dependencies are recreated with `npm install`.
+node_modules/
+
+# Production build output.
+dist/
+
+# Local Vite/Supabase environment files. Keep the example file committed.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# TypeScript build caches.
+*.tsbuildinfo
+
+# Editor / OS clutter.
+.DS_Store
+Thumbs.db
+.vscode/
