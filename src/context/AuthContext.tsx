@@ -127,6 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
+        // If email confirmation is enabled, Supabase can send the user back to
+        // the same DeviDex origin they signed up from. Add that origin to
+        // Supabase Auth -> URL Configuration -> Redirect URLs first.
+        emailRedirectTo: `${window.location.origin}/account`,
+
         // The database trigger copies this into public.profiles on account creation.
         data: { username: username.trim() || null },
       },

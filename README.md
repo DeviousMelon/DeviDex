@@ -1,78 +1,76 @@
-# DeviDex v0.2
+# DeviDex v0.2.1
 
 React + TypeScript + Vite foundation for a collector-first Living Dex tracker.
-This milestone adds routing, Supabase authentication and an admin role system while
-preserving the original DeviDex dashboard design.
+This build has the supplied Supabase project connected locally and includes the
+authentication/admin foundation.
 
-## Install / run
+## Run it
 
 ```bash
 npm install
 npm run dev
 ```
 
-Because v0.2 adds packages, **run `npm install` again even if you installed v0.1**.
+The Supabase Project URL and **publishable browser key** are already present in
+`.env.local`, so the login page should no longer show the “not connected” notice.
 
-## New in v0.2
+> `.env.local` is ignored by Git. The value stored there is a Supabase
+> **publishable** key, never a service-role key.
 
-- React Router (`/`, `/login`, `/account`, `/admin`, etc.)
-- Supabase browser client
-- Email/password sign-in + registration UI
-- Persistent auth sessions
-- `profiles` table with `user` / `admin` roles
-- Protected account route
-- Admin-only route + dashboard shell
-- PostgreSQL Row Level Security policies
-- Cloudflare Pages SPA `_redirects`
-- Graceful not-configured state before Supabase credentials are added
-- Explanatory comments throughout the auth/routing code
+## One-time Supabase setup you still need to do
 
-## Connect Supabase
+The browser key can connect the website to Supabase, but it cannot create database
+tables or grant itself admin powers. That would rather defeat the point of having
+security.
 
-1. Create a free Supabase project.
-2. Run `supabase/migrations/001_schema.sql` in Supabase's SQL Editor.
-3. Copy `.env.example` to `.env.local`.
-4. Put your Supabase Project URL and **publishable key** in `.env.local`.
-5. Restart `npm run dev`.
-6. Create your DeviDex account at `/login`.
-7. Follow `supabase/promote-admin.sql` to make your account the admin.
+1. Open your Supabase project.
+2. Go to **SQL Editor**.
+3. Paste/run `supabase/migrations/001_schema.sql` once.
+4. In **Authentication -> URL Configuration**, set the local Site URL to `http://localhost:5173` and allow `http://localhost:5173/**` as a redirect URL.
+5. Start DeviDex and open `/login`.
+6. Create the owner account using `devidex314@gmail.com`.
+7. Confirm the email if Supabase requires confirmation.
+8. Back in **SQL Editor**, paste/run `supabase/promote-admin.sql` once.
+9. Sign out/in or refresh DeviDex. The **Admin** navigation item should appear.
+10. Optional: run `supabase/checks/001_schema.sql` to verify the result.
 
-See `supabase/README.md` for the detailed sequence.
+## Authentication architecture
 
-## Important security idea
+- Supabase Auth verifies email/password and owns password storage.
+- `public.profiles.role` stores `user` or `admin`.
+- React's `AdminRoute` controls whether the admin UI renders.
+- PostgreSQL Row Level Security is the real data security boundary.
+- The service-role key must never be placed in this frontend.
 
-`AdminRoute.tsx` stops ordinary users seeing the admin interface, but **that alone is
-not security**. The SQL Row Level Security rules are what stop someone from manually
-calling the database API and performing admin-only operations.
+## Cloudflare later
 
-## Project structure
+`.env.local` only configures your local Vite build. When DeviDex goes onto
+Cloudflare Pages, add the same two variables to the Cloudflare project's build
+environment:
 
 ```text
-src/
-├── components/
-│   ├── ProtectedRoute.tsx
-│   ├── SiteHeader.tsx
-│   └── SiteFooter.tsx
-├── context/AuthContext.tsx
-├── data/samplePokemon.ts
-├── lib/supabase.ts
-├── pages/
-│   ├── DashboardPage.tsx
-│   ├── LoginPage.tsx
-│   ├── AccountPage.tsx
-│   ├── AdminPage.tsx
-│   └── PlaceholderPage.tsx
-├── App.tsx
-├── main.tsx
-└── styles.css
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+```
 
-supabase/
-├── migrations/001_schema.sql
-├── promote-admin.sql
-└── README.md
+Then redeploy so Vite includes them in the production build.
+
+## Useful project files
+
+```text
+src/lib/supabase.ts            Supabase browser client
+src/context/AuthContext.tsx   Session/profile handling
+src/components/ProtectedRoute.tsx
+src/pages/LoginPage.tsx
+src/pages/AdminPage.tsx
+supabase/migrations/001_schema.sql           One-time database foundation
+supabase/promote-admin.sql    Makes devidex314@gmail.com admin
+supabase/checks/001_schema.sql     Sanity check
+.env.local                    Local Supabase connection
 ```
 
 ## Next milestone
 
-The next logical build is the actual collection database: Pokémon species, forms,
-games and per-user Living Dex entries that sync through Supabase.
+Once login/admin is confirmed against the live Supabase project, the next build is
+the real collection database: species, forms, games, user collections and Living
+Dex completion synced through Supabase.
