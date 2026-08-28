@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-label="DeviDex stacked logo">
+  <rect width="900" height="900" fill="transparent"/>
+  <g transform="translate(194,90)">
+    <rect x="0" y="0" width="512" height="512" rx="96" fill="#F4FFFD"/>
+    <g transform="translate(96,70)">
+      <rect x="10" y="10" width="250" height="330" rx="34" fill="none" stroke="#568EA3" stroke-width="18"/>
+      <path d="M64 108 L86 130 L126 82" fill="none" stroke="#568EA3" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M64 180 L86 202 L126 154" fill="none" stroke="#568EA3" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M64 252 L86 274 L126 226" fill="none" stroke="#568EA3" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="150" y1="106" x2="214" y2="106" stroke="#568EA3" stroke-width="16" stroke-linecap="round"/>
+      <line x1="150" y1="178" x2="214" y2="178" stroke="#568EA3" stroke-width="16" stroke-linecap="round"/>
+      <line x1="150" y1="250" x2="214" y2="250" stroke="#568EA3" stroke-width="16" stroke-linecap="round"/>
+      <g transform="translate(240,16)">
+        <path d="M32 0 C34 15 45 26 60 28 C45 30 34 41 32 56 C30 41 19 30 4 28 C19 26 30 15 32 0Z" fill="#EAC435"/>
+      </g>
+    </g>
+  </g>
+  <text x="200" y="680" font-size="112" font-family="Inter, Arial, Helvetica, sans-serif" font-weight="700" fill="#568EA3">Devi</text>
+  <text x="470" y="680" font-size="112" font-family="Inter, Arial, Helvetica, sans-serif" font-weight="700" fill="#252627">Dex</text>
+  <text x="236" y="742" font-size="34" font-family="Inter, Arial, Helvetica, sans-serif" font-weight="500" fill="#252627">Track • Hunt • Complete</text>
+</svg>
