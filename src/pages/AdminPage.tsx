@@ -1,11 +1,12 @@
 import { AdminDataTools } from '../components/AdminDataTools';
+import { AdminReports } from '../components/AdminReports';
 import { useAuth } from '../context/AuthContext';
 
 const adminSections = [
   ['Pokémon Data', 'Species, forms and National Dex metadata', 'v0.4 active'],
   ['Games', 'Version groups and game-specific Dex definitions', 'v0.4 active'],
   ['Locations', 'Routes, areas and acquisition methods', 'Planned'],
-  ['Users', 'Account moderation and role management', 'Foundation ready'],
+  ['Users', 'Account moderation and role management', 'Reports active'],
   ['Announcements', 'Bank reminders, release notes and site notices', 'Planned'],
   ['Site Settings', 'Feature flags and maintenance controls', 'Planned'],
 ];
@@ -35,6 +36,8 @@ export function AdminPage() {
 
       {/* The importer lives inside the protected admin route. RLS also checks
           the admin role at the database layer before accepting any write. */}
+      <AdminReports />
+
       <AdminDataTools />
 
       <section className="section admin-section">

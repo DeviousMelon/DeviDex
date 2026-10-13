@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ProfileSocialActions } from '../components/ProfileSocialActions';
 import { profileAvatarUrl } from '../lib/profile';
 import { supabase } from '../lib/supabase';
 import type { UserProfile } from '../types';
@@ -77,6 +78,8 @@ export function PublicProfilePage() {
         <p className="eyebrow">DEVIDEX COLLECTOR</p>
         <h1>{profile.display_name || profile.username}</h1>
         <p className="profile-handle">@{profile.username}</p>
+
+        <ProfileSocialActions username={profile.username} />
 
         {profile.home_friend_code_public && profile.home_friend_code && (
           <div className="profile-code-card">

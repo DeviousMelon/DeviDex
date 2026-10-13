@@ -13,6 +13,13 @@ import { GameDexPage } from './pages/GameDexPage';
 import { PublicProfilePage } from './pages/PublicProfilePage';
 import { PokemonDetailPage } from './pages/PokemonDetailPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { FriendsPage } from './pages/FriendsPage';
+import { ComparePage } from './pages/ComparePage';
+import { TradeListPage } from './pages/TradeListPage';
+import { ChatPage } from './pages/ChatPage';
+import { ForumsPage } from './pages/ForumsPage';
+import { ForumPostPage } from './pages/ForumPostPage';
+import { NewForumPostPage } from './pages/NewForumPostPage';
 
 function LegacyCollectionsRedirect() {
   const location = useLocation();
@@ -36,10 +43,21 @@ function App() {
         <Route path="/games/:gameSlug" element={<GameDexPage />} />
         <Route path="/pokemon/:speciesSlug" element={<PokemonDetailPage />} />
 
-        {/* Public user pages exist now; forum/community features still do not. */}
+        {/* Public user pages. */}
         <Route path="/u/:username" element={<PublicProfilePage />} />
 
         <Route path="/hunts" element={<PlaceholderPage eyebrow="HUNTS" title="Shiny hunt tracker" description="Active hunts, counters and targets will eventually be managed from this route." />} />
+
+        {/* Social (v1.6–v1.9). Forums are readable signed out; the rest need an account. */}
+        <Route path="/friends" element={<ProtectedRoute><FriendsPage /></ProtectedRoute>} />
+        <Route path="/friends/:username" element={<ProtectedRoute><ComparePage /></ProtectedRoute>} />
+        <Route path="/trades" element={<ProtectedRoute><TradeListPage /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/chat/:conversationId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/forums" element={<ForumsPage />} />
+        <Route path="/forums/new" element={<ProtectedRoute><NewForumPostPage /></ProtectedRoute>} />
+        <Route path="/forums/post/:postId" element={<ForumPostPage />} />
+        <Route path="/forums/:category" element={<ForumsPage />} />
 
         <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
