@@ -1,7 +1,7 @@
 {
   "name": "devidex",
   "private": true,
-  "version": "0.2.1",
+  "version": "1.5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

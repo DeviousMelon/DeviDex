@@ -26,8 +26,8 @@ export const progressCards: ProgressCardData[] = [
   },
 ];
 
-// These examples deliberately use text/number placeholders rather than official artwork.
-// Sprite support can be added later without changing the layout structure.
+// Public homepage examples. DashboardPage renders their PokéAPI sprites and
+// swaps to shiny artwork where the demo status is shiny.
 export const recentPokemon: PokemonPreview[] = [
   { dexNumber: 1, name: 'Bulbasaur', status: 'owned' },
   { dexNumber: 2, name: 'Ivysaur', status: 'owned' },
