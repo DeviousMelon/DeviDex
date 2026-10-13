@@ -129,7 +129,7 @@ export function EvolutionChain({
     <section className="pokemon-info-card pokemon-evolution-card" id="evolution">
       <div className="pokemon-info-card__heading pokemon-info-card__heading--inline">
         <div>
-          <p className="eyebrow">EVOLUTION · {contextLabel}</p>
+          <p className="eyebrow">Evolution · {contextLabel}</p>
           <h2>Evolution chain</h2>
         </div>
         <span>Requirements are filtered to the selected game when PokéAPI provides game-specific rules.</span>

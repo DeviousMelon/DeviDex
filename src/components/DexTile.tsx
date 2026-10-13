@@ -8,7 +8,8 @@ type DexTileProps = {
   dexNumberWidth?: number;
   nationalDexNumber: number;
   name: string;
-  subtitle: string;
+  /** Only shown when it adds something (form type, regional Dex name). */
+  subtitle?: string;
   state: DexTileState;
   disabled?: boolean;
   forceShinyPreview?: boolean;
@@ -23,11 +24,12 @@ type DexTileProps = {
 const formatDexNumber = (number: number, width: number) => `#${number.toString().padStart(width, '0')}`;
 
 /**
- * One reusable collection tile for both the National Dex and individual games.
+ * One collection slot, for both the National Dex and individual games.
+ * Click cycles missing → owned → shiny → missing. Missing slots show a faded
+ * sprite, so gaps stand out at a glance.
  *
- * Battle-only forms use the same saved booleans, but their language says
- * "Represented" rather than "Owned" so DeviDex never implies a Mega/G-Max/etc.
- * can literally sit in a storage box.
+ * Battle-only forms say "Represented" rather than "Owned", so DeviDex never
+ * implies a Mega can literally sit in a storage box.
  */
 export function DexTile({
   dexNumber,
@@ -47,64 +49,45 @@ export function DexTile({
 }: DexTileProps) {
   const showShiny = state === 'shiny' || forceShinyPreview;
   const stateLabel = representationSlot
-    ? state === 'shiny' ? 'Shiny represented' : state === 'owned' ? 'Represented' : 'Unrepresented'
+    ? state === 'shiny' ? 'Shiny represented' : state === 'owned' ? 'Represented' : 'Not represented'
     : state === 'shiny' ? 'Shiny' : state === 'owned' ? 'Owned' : 'Missing';
+  const next = state === 'missing' ? 'owned' : state === 'owned' ? 'shiny' : 'missing';
 
   return (
-    <div className="dex-card-shell">
+    <div className={`tile tile--${state}${representationSlot ? ' tile--stand-in' : ''}`}>
       <button
-        className={`dex-card dex-card--${state}${representationSlot ? ' dex-card--representation' : ''}`}
+        className="tile__button"
         type="button"
         disabled={disabled}
         onClick={onCycle}
-        aria-label={`${name}: ${stateLabel}. Click to cycle collection status.`}
-        title={`${name} — ${stateLabel}. Click to cycle.`}
+        aria-label={`${name}, ${formatDexNumber(dexNumber, dexNumberWidth)}: ${stateLabel}. Activate to mark ${next}.`}
       >
-        <div className="dex-card__visual">
-          <span className="dex-card__number">{formatDexNumber(dexNumber, dexNumberWidth)}</span>
-
+        <span className="tile__number">{formatDexNumber(dexNumber, dexNumberWidth)}</span>
+        {state !== 'missing' && (
+          <span className={`tile__mark tile__mark--${state}`} aria-hidden="true">{state === 'shiny' ? '✦' : '✓'}</span>
+        )}
+        <span className="tile__art">
           <PokemonSprite
-            className="dex-card__sprite"
+            className="tile__sprite"
             nationalDexNumber={nationalDexNumber}
             name={name}
             shiny={showShiny}
             spriteUrl={spriteUrl}
             shinySpriteUrl={shinySpriteUrl}
           />
-
-          {state === 'shiny' && (
-            <span className="dex-card__shiny-mark" aria-hidden="true">✦</span>
-          )}
-
-          {representationSlot && (
-            <span className="dex-card__representation-mark" aria-hidden="true">R</span>
-          )}
-        </div>
-
-        <div className="dex-card__identity">
-          <strong title={name}>{name}</strong>
-          <span>{subtitle}</span>
-          {badges.length > 0 && (
-            <span className="dex-card__badges">
-              {badges.map((badge) => <i key={badge}>{badge}</i>)}
-            </span>
-          )}
-        </div>
-
-        <div className={`dex-card__status dex-card__status--${state}`}>
-          <span aria-hidden="true">{state === 'shiny' ? '✦' : state === 'owned' ? '✓' : '○'}</span>
-          <span>{stateLabel}</span>
-        </div>
+        </span>
+        <span className="tile__name" title={name}>{name}</span>
+        {(subtitle || representationSlot) && (
+          <span className="tile__meta">{representationSlot ? `Stand-in${subtitle ? ` · ${subtitle}` : ''}` : subtitle}</span>
+        )}
+        {badges.length > 0 && (
+          <span className="tile__badges">{badges.map((badge) => <i key={badge}>{badge}</i>)}</span>
+        )}
       </button>
 
       {detailsHref && (
-        <Link
-          className="dex-card__details-link"
-          to={detailsHref}
-          aria-label={`View ${name} information`}
-          title={`View ${name} information`}
-        >
-          i
+        <Link className="tile__info" to={detailsHref} aria-label={`About ${name}`} title={`About ${name}`}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" /><path d="M8 7.2v4M8 4.8v.1" /></svg>
         </Link>
       )}
     </div>

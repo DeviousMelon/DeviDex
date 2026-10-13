@@ -20,7 +20,7 @@ export function ResetPasswordPage() {
   return (
     <main className="account-page">
       <section className="account-card account-card--narrow">
-        <p className="eyebrow">ACCOUNT SECURITY</p>
+        <p className="eyebrow">Account security</p>
         <h1>Choose a new password.</h1>
         {!user ? (
           <p className="muted">Open this page using the password-reset link Supabase emailed you. The link creates the temporary recovery session needed to change your password.</p>

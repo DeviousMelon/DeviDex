@@ -103,11 +103,9 @@ export function FriendsPage() {
     <main className="social-page">
       <section className="social-hero">
         <div>
-          <p className="eyebrow">FRIENDS</p>
-          <h1>Your collecting crew.</h1>
+          <h1>Friends</h1>
           <p className="muted">
-            Add friends by username to chat, compare collections and find trades. Your friends see you
-            as <strong>@{profile.username}</strong>.
+            Add friends by username to chat, compare collections and find trades. You're <strong>@{profile.username}</strong>.
           </p>
         </div>
         <form className="social-add-form" onSubmit={handleAdd}>

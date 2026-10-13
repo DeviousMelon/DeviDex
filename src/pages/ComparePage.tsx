@@ -120,7 +120,6 @@ export function ComparePage() {
         <div className="compare-hero__people">
           <UserAvatar user={friend} size="lg" />
           <div>
-            <p className="eyebrow">COMPARE & TRADE</p>
             <h1>You and {socialName(friend)}</h1>
             <p className="muted">Measured against the forms you track. <Link to="/trades">Edit your trade list</Link></p>
           </div>

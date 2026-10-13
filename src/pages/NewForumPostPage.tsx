@@ -55,8 +55,7 @@ export function NewForumPostPage() {
     <main className="forum-thread-page">
       <Link className="text-button" to={category ? `/forums/${category}` : '/forums'}>← Back</Link>
       <form className="forum-new-post" onSubmit={handleSubmit}>
-        <p className="eyebrow">NEW POST</p>
-        <h1>Start a thread.</h1>
+        <h1>New post</h1>
 
         <label className="social-field">
           Forum

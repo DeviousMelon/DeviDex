@@ -10,13 +10,6 @@ type ReportDialogProps = {
   onClose: () => void;
 };
 
-const TARGET_WORDS: Record<ReportTargetType, string> = {
-  user: 'collector',
-  message: 'message',
-  forum_post: 'post',
-  forum_comment: 'comment',
-};
-
 /**
  * One report form for users, messages, posts and comments. The database takes
  * its own snapshot of the reported content, so this only sends an id + reason.
@@ -58,10 +51,9 @@ export function ReportDialog({ open, targetType, targetId, targetLabel, onClose 
     <dialog ref={dialogRef} className="social-dialog" onClose={onClose} aria-labelledby="report-dialog-title">
       {sent ? (
         <div className="social-dialog__body">
-          <p className="eyebrow">REPORT SENT</p>
-          <h2 id="report-dialog-title">Thanks for flagging it.</h2>
+          <h2 id="report-dialog-title">Report sent</h2>
           <p className="muted">
-            An admin will take a look. The person you reported is not told who reported them.
+            Thanks. An admin will take a look. The person you reported isn't told who reported them.
           </p>
           <div className="social-dialog__actions">
             <button className="button button--primary" type="button" onClick={onClose}>Done</button>
@@ -69,7 +61,6 @@ export function ReportDialog({ open, targetType, targetId, targetLabel, onClose 
         </div>
       ) : (
         <form className="social-dialog__body" onSubmit={handleSubmit}>
-          <p className="eyebrow">REPORT {TARGET_WORDS[targetType].toUpperCase()}</p>
           <h2 id="report-dialog-title">Report {targetLabel}</h2>
 
           <fieldset className="report-reasons">

@@ -51,26 +51,31 @@ export function LoginPage() {
   }
 
   const title = mode === 'signin'
-    ? 'Welcome back.'
+    ? 'Sign in'
     : mode === 'signup'
-      ? 'Start your collection.'
-      : 'Reset your password.';
+      ? 'Create your account'
+      : 'Reset your password';
+  const intro = mode === 'signin'
+    ? 'Pick up your collection on any device.'
+    : mode === 'signup'
+      ? 'Free. Saves your progress, and lets you add friends, chat and post.'
+      : "We'll email you a link to choose a new password.";
 
   return (
     <main className="auth-page">
       <section className="auth-card">
         <div className="auth-card__brand">
-          <img src="/assets/logos/devidex-symbol.svg" alt="" />
+          <img src="/assets/logos/devidex-symbol.svg" alt="" width="44" height="44" />
           <div>
-            <p className="eyebrow">DEVIDEX ACCOUNT</p>
             <h1>{title}</h1>
+            <p className="muted">{intro}</p>
           </div>
         </div>
 
         {!configured && (
           <div className="setup-notice">
-            <strong>Supabase is not connected yet.</strong>
-            <p>Add your Supabase URL and publishable key to <code>.env.local</code>.</p>
+            <strong>Accounts are unavailable right now.</strong>
+            <p>You can still use the National Dex as a guest. Please try signing in again later.</p>
           </div>
         )}
 
@@ -128,16 +133,6 @@ export function LoginPage() {
         </form>
       </section>
 
-      <aside className="auth-sidecopy">
-        <p className="eyebrow">WHY AN ACCOUNT?</p>
-        <h2>Save the collection you were already tracking.</h2>
-        <p>You can use DeviDex while logged out. An account simply makes the progress persist and sync between devices.</p>
-        <div className="auth-feature-list">
-          <span>✓ Cloud collection saves</span>
-          <span>✓ Game-specific Dex progress</span>
-          <span>✓ Public profile if you want one</span>
-        </div>
-      </aside>
     </main>
   );
 }

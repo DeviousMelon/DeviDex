@@ -836,8 +836,7 @@ function NewGroupDialog({ open, onClose, onCreated }: {
   return (
     <dialog ref={dialogRef} className="social-dialog" onClose={onClose} aria-labelledby="new-group-title">
       <form className="social-dialog__body" onSubmit={handleSubmit}>
-        <p className="eyebrow">NEW GROUP</p>
-        <h2 id="new-group-title">Start a group chat</h2>
+        <h2 id="new-group-title">New group chat</h2>
         <label className="social-field">
           Group name
           <input value={title} maxLength={60} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Shiny hunters" required />
