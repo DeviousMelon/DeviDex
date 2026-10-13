@@ -5,7 +5,9 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { GuestProgressProvider } from './context/GuestProgressContext';
 import { FormPreferencesProvider } from './context/FormPreferencesContext';
+import { SocialProvider } from './context/SocialContext';
 import './styles.css';
+import './social.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Could not find the #root element. Check index.html.');
@@ -20,7 +22,10 @@ createRoot(rootElement).render(
         <FormPreferencesProvider>
           {/* Guest progress lives only for this open browser session. */}
           <GuestProgressProvider>
-            <App />
+            {/* Friend-request and unread-chat badges for the header. */}
+            <SocialProvider>
+              <App />
+            </SocialProvider>
           </GuestProgressProvider>
         </FormPreferencesProvider>
       </AuthProvider>
