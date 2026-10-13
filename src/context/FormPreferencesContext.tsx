@@ -53,6 +53,8 @@ type FormPreferencesContextValue = {
   saving: boolean;
   saveError: string | null;
   setPreference: (key: PreferenceKey, enabled: boolean) => Promise<void>;
+  /** Replace every form rule at once, keeping the goal. */
+  setAllPreferences: (next: FormPreferences) => Promise<void>;
   setGoal: (goal: CollectionGoal) => Promise<void>;
   applyPreset: (presetId: Exclude<CollectionPresetId, 'custom'>) => Promise<void>;
   resetPreferences: () => Promise<void>;
@@ -288,6 +290,10 @@ export function FormPreferencesProvider({ children }: { children: ReactNode }) {
     await commitDefinition(next, goal, nextPreset);
   }, [commitDefinition, goal, preferences]);
 
+  const setAllPreferences = useCallback(async (next: FormPreferences) => {
+    await commitDefinition({ ...next }, goal, presetForDefinition(next, goal));
+  }, [commitDefinition, goal]);
+
   const setGoal = useCallback(async (nextGoal: CollectionGoal) => {
     const nextPreset = presetForDefinition(preferences, nextGoal);
     await commitDefinition(preferences, nextGoal, nextPreset);
@@ -443,6 +449,7 @@ export function FormPreferencesProvider({ children }: { children: ReactNode }) {
     saving,
     saveError,
     setPreference,
+    setAllPreferences,
     setGoal,
     applyPreset,
     resetPreferences,
@@ -461,6 +468,7 @@ export function FormPreferencesProvider({ children }: { children: ReactNode }) {
     saving,
     saveError,
     setPreference,
+    setAllPreferences,
     setGoal,
     applyPreset,
     resetPreferences,
