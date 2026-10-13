@@ -197,6 +197,9 @@ export function contextLabel(versionGroup: string) {
   return family?.contexts.find((context) => context.versionGroup === versionGroup)?.label ?? versionGroup;
 }
 
+/** Every game version in release order (for "newest entry before X" lookups). */
+export const VERSION_ORDER: string[] = GAME_FAMILIES.flatMap((family) => family.versions.map((version) => version.slug));
+
 export function versionLabel(version: string) {
   const family = gameFamilyForVersion(version);
   return family?.versions.find((candidate) => candidate.slug === version)?.label ?? version;

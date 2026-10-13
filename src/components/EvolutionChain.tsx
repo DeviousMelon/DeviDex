@@ -43,8 +43,7 @@ function EvolutionNode({
       )}
       <span>
         <strong>{name}</strong>
-        {node.is_baby && <small>Baby Pokémon</small>}
-        {isCurrent && <small>Current species</small>}
+        {node.is_baby && <small>Baby</small>}
       </span>
     </Link>
   );
@@ -52,19 +51,20 @@ function EvolutionNode({
 
 function EvolutionRequirement({
   node,
+  fromSpeciesSlug,
   versionGroups,
 }: {
   node: EvolutionChainLink;
+  fromSpeciesSlug: string;
   versionGroups: string[];
 }) {
-  const groups = groupEvolutionRequirements(node.evolution_details, node.species.name, versionGroups);
-  const hasMultipleMethods = groups.length > 1;
+  const groups = groupEvolutionRequirements(node.evolution_details, node.species.name, { versionGroups, fromSpeciesSlug });
 
   return (
     <div className="evolution-requirement" aria-label="Evolution requirement">
       <span className="evolution-requirement__arrow" aria-hidden="true">→</span>
       <div className="evolution-requirement__content">
-        {hasMultipleMethods && <small className="evolution-requirement__label">Multiple methods in this game context</small>}
+        {groups.length > 1 && <small className="evolution-requirement__label">Any of these</small>}
         {groups.map((group) => (
           <div className="evolution-requirement__method" key={`${group.summary}-${group.versions.join('-')}`}>
             <strong>{group.summary}</strong>
@@ -97,7 +97,7 @@ function EvolutionBranch({
         <div className="evolution-branch__children">
           {node.evolves_to.map((child) => (
             <div className="evolution-path" key={`${node.species.name}-${child.species.name}`}>
-              <EvolutionRequirement node={child} versionGroups={versionGroups} />
+              <EvolutionRequirement node={child} fromSpeciesSlug={node.species.name} versionGroups={versionGroups} />
               <EvolutionBranch
                 node={child}
                 currentSpeciesSlug={currentSpeciesSlug}
@@ -126,19 +126,16 @@ export function EvolutionChain({
   queryString: string;
 }) {
   return (
-    <section className="pokemon-info-card pokemon-evolution-card" id="evolution">
-      <div className="pokemon-info-card__heading pokemon-info-card__heading--inline">
-        <div>
-          <p className="eyebrow">Evolution · {contextLabel}</p>
-          <h2>Evolution chain</h2>
-        </div>
-        <span>Requirements are filtered to the selected game when PokéAPI provides game-specific rules.</span>
+    <section className="panel pokemon-section pokemon-evolution" id="evolution" aria-labelledby="evolution-title">
+      <div className="pokemon-section__head">
+        <h2 id="evolution-title">Evolution</h2>
+        <span className="pokemon-section__context">{contextLabel}</span>
       </div>
 
       {chain.baby_trigger_item && (
         <div className="evolution-baby-note">
-          <strong>Baby breeding trigger</strong>
-          <span>Historically requires a parent holding {humanizeApiName(chain.baby_trigger_item.name)}.</span>
+          <strong>Breeding</strong>
+          <span>To hatch the baby, a parent must hold {humanizeApiName(chain.baby_trigger_item.name)}.</span>
         </div>
       )}
 
@@ -150,10 +147,6 @@ export function EvolutionChain({
           queryString={queryString}
         />
       </div>
-
-      <p className="evolution-data-note">
-        DeviDex keeps unrelated historical evolution methods out of the current game view. Switch generation/game above to inspect how the method changed over time.
-      </p>
     </section>
   );
 }

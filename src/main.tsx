@@ -9,6 +9,7 @@ import { SocialProvider } from './context/SocialContext';
 import './styles.css';
 import './social.css';
 import './theme.css';
+import './pokemon.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Could not find the #root element. Check index.html.');

@@ -1,6 +1,8 @@
 // Small, typed PokéAPI client used by the public Pokémon information pages.
 // DeviDex deliberately fetches detail data on demand instead of bulk-importing
 // thousands of rarely-viewed records into Supabase during Phase 7A.
+import { formatPokemonName } from './pokemonNames';
+import { contextLabel } from './gameContext';
 
 export type NamedApiResource = {
   name: string;
@@ -106,13 +108,25 @@ export function latestEnglishFlavorText(species: PokemonSpeciesDetail) {
   return latest.replace(/[\n\f\r]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export function englishFlavorTextForVersion(species: PokemonSpeciesDetail, versionSlug: string) {
-  const exact = species.flavor_text_entries.find(
-    (entry) => entry.language.name === 'en' && entry.version.name === versionSlug,
-  )?.flavor_text;
-  // A missing entry is more honest than borrowing flavour text from another game
-  // while the page is explicitly claiming to show one selected version.
-  return (exact ?? '').replace(/[\n\f\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+/**
+ * The Pokédex entry for the selected game. PokéAPI is missing entries for some
+ * games (Scarlet/Violet, for one), so this falls back to the newest English
+ * entry from an earlier game and says which game it came from.
+ */
+export function pokedexEntryForVersion(species: PokemonSpeciesDetail, versionSlug: string, versionOrder: string[]) {
+  const english = species.flavor_text_entries.filter((entry) => entry.language.name === 'en');
+  const clean = (text: string) => text.replace(/[\n\f\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const exact = english.find((entry) => entry.version.name === versionSlug);
+  if (exact) return { text: clean(exact.flavor_text), version: versionSlug, exact: true };
+  const selectedIndex = versionOrder.indexOf(versionSlug);
+  const earlier = english
+    .filter((entry) => {
+      const index = versionOrder.indexOf(entry.version.name);
+      return index >= 0 && (selectedIndex < 0 || index < selectedIndex);
+    })
+    .sort((a, b) => versionOrder.indexOf(b.version.name) - versionOrder.indexOf(a.version.name))[0]
+    ?? english[english.length - 1];
+  return earlier ? { text: clean(earlier.flavor_text), version: earlier.version.name, exact: false } : null;
 }
 
 function generationNumber(resource: NamedApiResource) {
@@ -236,7 +250,7 @@ export function moveLearnMethodLabel(slug: string) {
 
 export function moveLevelLabel(method: string, level: number) {
   if (method !== 'level-up') return moveLearnMethodLabel(method);
-  return level > 0 ? `Lv. ${level}` : 'Start / reminder';
+  return level > 0 ? `Lv. ${level}` : 'Evolve';
 }
 
 export function formatMachineItemName(slug: string) {
@@ -339,8 +353,13 @@ export type EvolutionDetail = {
   needs_multiplayer?: boolean;
   near_special_rock?: boolean;
   region?: NamedApiResource | null;
+  /** Older PokéAPI field names. */
   base_form?: NamedApiResource | null;
   evolved_form?: NamedApiResource | null;
+  required_pokemon_form?: NamedApiResource | null;
+  evolved_pokemon_form?: NamedApiResource | null;
+  allowed_natures?: NamedApiResource[] | null;
+  condition_expression?: { expression: string; percentage_chance: number | null } | null;
   used_move?: NamedApiResource | null;
   min_move_count?: number | null;
   min_steps?: number | null;
@@ -365,6 +384,87 @@ export type EvolutionRequirementGroup = {
   versions: string[];
 };
 
+/**
+ * Release order of PokéAPI version groups (its own `order` column) plus the
+ * generation each belongs to. PokéAPI tags an evolution method with the game
+ * that introduced it, so "valid in game X" means "the newest method at or
+ * before X".
+ */
+const VERSION_GROUP_ORDER: Record<string, [order: number, generation: number]> = {
+  'red-green-japan': [1, 1], 'blue-japan': [2, 1], 'red-blue': [3, 1], yellow: [4, 1],
+  'gold-silver': [5, 2], crystal: [6, 2],
+  'ruby-sapphire': [7, 3], emerald: [8, 3], colosseum: [9, 3], xd: [10, 3], 'firered-leafgreen': [11, 3],
+  'diamond-pearl': [12, 4], platinum: [13, 4], 'heartgold-soulsilver': [14, 4],
+  'black-white': [15, 5], 'black-2-white-2': [16, 5],
+  'x-y': [17, 6], 'omega-ruby-alpha-sapphire': [18, 6],
+  'sun-moon': [19, 7], 'ultra-sun-ultra-moon': [20, 7], 'lets-go-pikachu-lets-go-eevee': [21, 7],
+  'sword-shield': [22, 8], 'the-isle-of-armor': [23, 8], 'the-crown-tundra': [24, 8],
+  'brilliant-diamond-shining-pearl': [25, 8], 'legends-arceus': [26, 8],
+  'scarlet-violet': [27, 9], 'the-teal-mask': [28, 9], 'the-indigo-disk': [29, 9],
+  'legends-za': [30, 9], 'mega-dimension': [31, 9], champions: [32, 9],
+};
+
+/** Where each game is set. Regional branches and location methods only work there. */
+const VERSION_GROUP_REGION: Record<string, string> = {
+  'red-green-japan': 'kanto', 'blue-japan': 'kanto', 'red-blue': 'kanto', yellow: 'kanto',
+  'firered-leafgreen': 'kanto', 'lets-go-pikachu-lets-go-eevee': 'kanto',
+  'gold-silver': 'johto', crystal: 'johto', 'heartgold-soulsilver': 'johto',
+  'ruby-sapphire': 'hoenn', emerald: 'hoenn', 'omega-ruby-alpha-sapphire': 'hoenn',
+  colosseum: 'orre', xd: 'orre',
+  'diamond-pearl': 'sinnoh', platinum: 'sinnoh', 'brilliant-diamond-shining-pearl': 'sinnoh',
+  'black-white': 'unova', 'black-2-white-2': 'unova',
+  'x-y': 'kalos', 'legends-za': 'kalos', 'mega-dimension': 'kalos',
+  'sun-moon': 'alola', 'ultra-sun-ultra-moon': 'alola',
+  'sword-shield': 'galar', 'the-isle-of-armor': 'galar', 'the-crown-tundra': 'galar',
+  'legends-arceus': 'hisui',
+  'scarlet-violet': 'paldea', 'the-teal-mask': 'kitakami', 'the-indigo-disk': 'unova',
+};
+
+const REGIONAL_ADJECTIVE: Record<string, string> = {
+  alola: 'Alolan', galar: 'Galarian', hisui: 'Hisuian', paldea: 'Paldean',
+};
+
+function versionRank(detail: EvolutionDetail) {
+  const name = detail.version_group?.name;
+  if (!name) return 0;
+  return VERSION_GROUP_ORDER[name]?.[0] ?? 999;
+}
+
+function versionRegion(detail: EvolutionDetail) {
+  const name = detail.version_group?.name;
+  return name ? VERSION_GROUP_REGION[name] ?? null : null;
+}
+
+/** "sandshrew-alola" → "Alolan Sandshrew"; "rockruff-own-tempo" → "Rockruff (Own Tempo)". */
+export function evolutionFormLabel(formSlug: string, speciesSlug?: string) {
+  if (!speciesSlug || !formSlug.startsWith(`${speciesSlug}-`)) return humanizeApiName(formSlug);
+  const species = formatPokemonName(speciesSlug);
+  const [first, ...rest] = formSlug.slice(speciesSlug.length + 1).split('-');
+  const regional = REGIONAL_ADJECTIVE[first];
+  if (regional) return `${regional} ${species}`; // "-galar-standard" etc. is still just Galarian
+  return `${species} (${humanizeApiName([first, ...rest].join('-'))})`;
+}
+
+function requiredForm(detail: EvolutionDetail) {
+  return detail.required_pokemon_form?.name ?? detail.base_form?.name ?? null;
+}
+
+function evolvedForm(detail: EvolutionDetail) {
+  return detail.evolved_pokemon_form?.name ?? detail.evolved_form?.name ?? null;
+}
+
+type FormNames = { fromSpecies?: string; toSpecies?: string };
+
+/** Form text, left out when it's just the plain species ("eevee" → "eevee"). */
+function formRequirements(detail: EvolutionDetail, names: FormNames) {
+  const parts: string[] = [];
+  const from = requiredForm(detail);
+  const to = evolvedForm(detail);
+  if (from && from !== names.fromSpecies) parts.push(`from ${evolutionFormLabel(from, names.fromSpecies)}`);
+  if (to && to !== names.toSpecies) parts.push(`becomes ${evolutionFormLabel(to, names.toSpecies)}`);
+  return parts;
+}
+
 function genderRequirement(gender: number | null) {
   if (gender === 1) return 'Female';
   if (gender === 2) return 'Male';
@@ -375,6 +475,8 @@ function triggerSummary(detail: EvolutionDetail) {
   const trigger = detail.trigger.name;
   switch (trigger) {
     case 'level-up': return detail.min_level ? `Level up to Lv. ${detail.min_level}` : 'Level up';
+    case 'in-battle-level-up': return detail.min_level ? `Reach Lv. ${detail.min_level} in battle` : 'Level up in battle';
+    case 'meltan-candies': return 'In Pokémon GO, spend 400 Meltan Candy';
     case 'trade': return detail.trade_species ? `Trade with ${humanizeApiName(detail.trade_species.name)}` : 'Trade';
     case 'use-item': return detail.item ? `Use ${humanizeApiName(detail.item.name)}` : 'Use an evolution item';
     case 'shed': return 'Evolve Nincada with an empty party slot; later games also require a spare Poké Ball';
@@ -404,32 +506,40 @@ function triggerSummary(detail: EvolutionDetail) {
   }
 }
 
-export function evolutionRequirementSummary(detail: EvolutionDetail, targetSpeciesSlug?: string) {
-  const specialTargetSummary: Record<string, string> = {
-    silcoon: `Level up to Lv. 7 · Wurmple's personality value determines this branch`,
-    cascoon: `Level up to Lv. 7 · Wurmple's personality value determines this branch`,
-    melmetal: 'In Pokémon GO, spend 400 Meltan Candy',
-  };
-  if (targetSpeciesSlug && specialTargetSummary[targetSpeciesSlug]) return specialTargetSummary[targetSpeciesSlug];
+const SPECIAL_TARGET_SUMMARY: Record<string, string> = {
+  silcoon: `Level up to Lv. 7 · Wurmple's personality value picks Silcoon or Cascoon`,
+  cascoon: `Level up to Lv. 7 · Wurmple's personality value picks Silcoon or Cascoon`,
+  melmetal: 'In Pokémon GO, spend 400 Meltan Candy',
+  alcremie: 'Hold a Sweet and spin your character · the Sweet, time of day and spin pick the flavour',
+  toxtricity: 'Level up to Lv. 30 · its Nature decides Amped or Low Key form',
+};
 
+export function evolutionRequirementSummary(detail: EvolutionDetail, targetSpeciesSlug?: string, fromSpeciesSlug?: string) {
+  if (targetSpeciesSlug && SPECIAL_TARGET_SUMMARY[targetSpeciesSlug]) return SPECIAL_TARGET_SUMMARY[targetSpeciesSlug];
+  return [...baseRequirements(detail, targetSpeciesSlug), ...formRequirements(detail, { fromSpecies: fromSpeciesSlug, toSpecies: targetSpeciesSlug })].join(' · ');
+}
+
+function baseRequirements(detail: EvolutionDetail, targetSpeciesSlug?: string, hideRegion = false) {
   const requirements: string[] = [triggerSummary(detail)];
   const gender = genderRequirement(detail.gender);
+  const levelInTrigger = ['level-up', 'in-battle-level-up'].includes(detail.trigger.name);
 
   // For use-item evolutions, the item is already the main trigger text.
   if (detail.item && detail.trigger.name !== 'use-item') requirements.push(`use ${humanizeApiName(detail.item.name)}`);
-  if (detail.min_level != null && detail.trigger.name !== 'level-up') requirements.push(`at Lv. ${detail.min_level} or higher`);
+  if (detail.min_level != null && !levelInTrigger) requirements.push(`at Lv. ${detail.min_level} or higher`);
   if (detail.held_item) requirements.push(`while holding ${humanizeApiName(detail.held_item.name)}`);
   if (gender) requirements.push(`${gender} only`);
   if (detail.known_move) requirements.push(`while knowing ${humanizeApiName(detail.known_move.name)}`);
   if (detail.known_move_type) requirements.push(`while knowing a ${humanizeApiName(detail.known_move_type.name)}-type move`);
-  if (detail.min_happiness != null) requirements.push(`friendship at least ${detail.min_happiness}`);
-  if (detail.min_beauty != null) requirements.push(`Beauty at least ${detail.min_beauty}`);
-  if (detail.min_affection != null) requirements.push(`Affection at least ${detail.min_affection}`);
-  if (detail.time_of_day) requirements.push(`during ${humanizeApiName(detail.time_of_day)}`);
-  if (detail.location) requirements.push(`at ${humanizeApiName(detail.location.name)}`);
+  if (detail.min_happiness != null) requirements.push(`friendship ${detail.min_happiness}+`);
+  if (detail.min_beauty != null) requirements.push(`Beauty ${detail.min_beauty}+`);
+  if (detail.min_affection != null) requirements.push(`Affection ${detail.min_affection}+`);
+  if (detail.time_of_day) requirements.push(detail.time_of_day === 'day' ? 'during the day' : `at ${detail.time_of_day}`);
   if (detail.near_special_rock) {
-    const rock = targetSpeciesSlug === 'leafeon' ? 'Moss Rock' : targetSpeciesSlug === 'glaceon' ? 'Ice Rock' : 'the required special rock';
-    requirements.push(`near ${rock}`);
+    const rock = targetSpeciesSlug === 'leafeon' ? 'the Moss Rock' : targetSpeciesSlug === 'glaceon' ? 'the Ice Rock' : 'the special rock';
+    requirements.push(`near ${rock}${detail.location ? ` in ${humanizeApiName(detail.location.name)}` : ''}`);
+  } else if (detail.location) {
+    requirements.push(`at ${humanizeApiName(detail.location.name)}`);
   }
   if (detail.needs_overworld_rain) requirements.push('while it is raining in the overworld');
   if (detail.party_species) requirements.push(`with ${humanizeApiName(detail.party_species.name)} in the party`);
@@ -439,8 +549,12 @@ export function evolutionRequirementSummary(detail: EvolutionDetail, targetSpeci
   if (detail.relative_physical_stats === 0) requirements.push('with Attack equal to Defense');
   if (detail.turn_upside_down) requirements.push('while the console is held upside down');
   if (detail.needs_multiplayer) requirements.push('while connected in multiplayer');
-  if (detail.region) requirements.push(`in ${humanizeApiName(detail.region.name)}`);
-  if (detail.min_steps != null) requirements.push(`after walking at least ${detail.min_steps.toLocaleString()} steps together`);
+  if (detail.region && !hideRegion) requirements.push(`in ${humanizeApiName(detail.region.name)}`);
+  if (detail.min_steps != null) requirements.push(`after walking ${detail.min_steps.toLocaleString()} steps with it out`);
+  if (detail.allowed_natures?.length) {
+    const natures = detail.allowed_natures.map((nature) => humanizeApiName(nature.name));
+    requirements.push(natures.length <= 4 ? `with a ${natures.join(', ')} nature` : `with one of ${natures.length} natures`);
+  }
 
   // Some newer evolution triggers encode the move count in the trigger itself.
   const moveCountHandled = ['agile-style-move', 'strong-style-move', 'use-move'].includes(detail.trigger.name);
@@ -452,46 +566,104 @@ export function evolutionRequirementSummary(detail: EvolutionDetail, targetSpeci
   if (!damageHandled && detail.min_damage_taken != null) {
     requirements.push(`after taking at least ${detail.min_damage_taken} damage`);
   }
-  if (detail.base_form) requirements.push(`from ${humanizeApiName(detail.base_form.name)} form`);
-  if (detail.evolved_form) requirements.push(`results in ${humanizeApiName(detail.evolved_form.name)} form`);
+  const chance = detail.condition_expression?.percentage_chance;
+  if (chance != null && chance < 100) requirements.push(`${chance}% chance`);
+  return requirements;
+}
 
-  return requirements.join(' · ');
+export type EvolutionContext = {
+  /** Version groups that make up the selected game (base game first). */
+  versionGroups?: string[];
+  /** Species the evolution starts from, so plain forms aren't spelled out. */
+  fromSpeciesSlug?: string;
+};
+
+/**
+ * Which methods actually work in the selected game. PokéAPI tags each method
+ * with the game that introduced it, so for each branch we keep the newest
+ * method released at or before the selected game. Regional branches (Alolan
+ * Raichu, Hisuian Typhlosion) only apply in their region's games and replace
+ * the normal method there. Location methods (Magnezone, Leafeon) are tied to
+ * that generation's map.
+ */
+function detailsForGame(details: EvolutionDetail[], versionGroups: string[], fromSpeciesSlug?: string, toSpeciesSlug?: string) {
+  // A form named exactly like the species is just the normal Pokémon.
+  const fromForm = (detail: EvolutionDetail) => { const form = requiredForm(detail); return form === fromSpeciesSlug ? null : form; };
+  const toForm = (detail: EvolutionDetail) => { const form = evolvedForm(detail); return form === toSpeciesSlug ? null : form; };
+  const selected = versionGroups
+    .map((group) => VERSION_GROUP_ORDER[group])
+    .filter(Boolean)
+    .sort((a, b) => b[0] - a[0])[0];
+  if (!selected) return details;
+  const [rank] = selected;
+  const regions = new Set(versionGroups.map((group) => VERSION_GROUP_REGION[group]).filter(Boolean));
+
+  let candidates = details.filter((detail) => versionRank(detail) <= rank);
+  candidates = candidates.filter((detail) => !detail.region || regions.has(detail.region.name));
+  // "Level up at Mt. Coronet" only makes sense on Sinnoh's map.
+  candidates = candidates.filter((detail) => !(detail.location || detail.near_special_rock) || regions.has(versionRegion(detail) ?? ''));
+  if (candidates.some((detail) => detail.region)) {
+    candidates = candidates.filter((detail) => detail.region || fromForm(detail));
+  }
+
+  const branches = new Map<string, EvolutionDetail[]>();
+  for (const detail of candidates) {
+    const key = [detail.region?.name, fromForm(detail), toForm(detail)].join('|');
+    const list = branches.get(key) ?? [];
+    list.push(detail);
+    branches.set(key, list);
+  }
+  return [...branches.values()].flatMap((list) => {
+    const newest = Math.max(...list.map(versionRank));
+    return list.filter((detail) => versionRank(detail) === newest);
+  });
 }
 
 export function groupEvolutionRequirements(
   details: EvolutionDetail[] | null | undefined,
   targetSpeciesSlug?: string,
-  allowedVersionGroups?: string[],
+  context: EvolutionContext = {},
 ): EvolutionRequirementGroup[] {
-  if (!details?.length) return [{ summary: 'No evolution requirement data is listed.', versions: [] }];
+  if (!details?.length) return [{ summary: 'No evolution method is listed.', versions: [] }];
+  const { versionGroups, fromSpeciesSlug } = context;
+  const filtered = versionGroups?.length;
+  const source = filtered ? detailsForGame(details, versionGroups, fromSpeciesSlug, targetSpeciesSlug) : details;
 
-  const allowed = allowedVersionGroups?.length ? new Set(allowedVersionGroups) : null;
-  const unversioned = details.filter((detail) => !detail.version_group?.name);
-  const matching = allowed
-    ? details.filter((detail) => detail.version_group?.name && allowed.has(detail.version_group.name))
-    : details;
-  // Common unversioned rules apply in every game. If PokéAPI has a rule tied
-  // to this exact version group, include it too; unrelated historical methods
-  // stay out of the current-game view.
-  const relevant = allowed ? [...unversioned, ...matching] : details;
-  if (allowed && relevant.length === 0) {
-    return [{ summary: 'No evolution method is listed for this selected game.', versions: [] }];
+  if (!source.length) {
+    const earliest = [...details].sort((a, b) => versionRank(a) - versionRank(b))[0];
+    const selectedRank = Math.max(...versionGroups!.map((group) => VERSION_GROUP_ORDER[group]?.[0] ?? 0));
+    const later = earliest?.version_group?.name && versionRank(earliest) > selectedRank ? earliest.version_group.name : null;
+    return [{ summary: later ? `Not in this game · added in ${contextLabel(later)}` : "Can't evolve in this game", versions: [] }];
   }
-  const source = relevant.length ? relevant : details;
+
+  // Methods that only differ by which form you start with (Burmy cloaks,
+  // Vivillon patterns, Flabébé colours) collapse into one line.
+  const byBase = new Map<string, { details: EvolutionDetail[] }>();
+  for (const detail of source) {
+    const special = targetSpeciesSlug ? SPECIAL_TARGET_SUMMARY[targetSpeciesSlug] : undefined;
+    const base = special ?? baseRequirements(detail, targetSpeciesSlug, Boolean(filtered)).join(' · ');
+    const entry = byBase.get(base) ?? { details: [] };
+    entry.details.push(detail);
+    byBase.set(base, entry);
+  }
 
   const grouped = new Map<string, Set<string>>();
-  for (const detail of source) {
-    const summary = evolutionRequirementSummary(detail, targetSpeciesSlug);
-    const versions = grouped.get(summary) ?? new Set<string>();
-    if (detail.version_group?.name) versions.add(detail.version_group.name);
-    grouped.set(summary, versions);
+  for (const [base, entry] of byBase) {
+    const special = targetSpeciesSlug ? SPECIAL_TARGET_SUMMARY[targetSpeciesSlug] : undefined;
+    const formTexts = new Set(entry.details.map((detail) => formRequirements(detail, { fromSpecies: fromSpeciesSlug, toSpecies: targetSpeciesSlug }).join(' · ')));
+    const summaries = special
+      ? [special]
+      : formTexts.size >= 3
+        ? [`${base} · keeps its form`]
+        : [...formTexts].map((forms) => (forms ? `${base} · ${forms}` : base));
+    for (const summary of summaries) {
+      const versions = grouped.get(summary) ?? new Set<string>();
+      if (!filtered) entry.details.forEach((detail) => detail.version_group?.name && versions.add(detail.version_group.name));
+      grouped.set(summary, versions);
+    }
   }
 
-  const result = [...grouped.entries()].map(([summary, versions]) => ({
-    summary,
-    versions: [...versions],
-  }));
-
+  const result = [...grouped.entries()].map(([summary, versions]) => ({ summary, versions: [...versions] }));
   if (result.length === 1) result[0].versions = [];
   return result;
 }

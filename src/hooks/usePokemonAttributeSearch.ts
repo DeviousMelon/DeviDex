@@ -1,17 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchPokeApiJson, type NamedApiResource } from '../lib/pokeapi';
+import { fetchPokeApiJson, humanizeApiName, type NamedApiResource } from '../lib/pokeapi';
 
 export type PokemonSearchMode = 'pokemon' | 'type' | 'move';
 
-type TypeSearchResponse = {
-  pokemon: Array<{ pokemon: NamedApiResource }>;
-};
+type TypeSearchResponse = { pokemon: Array<{ pokemon: NamedApiResource }> };
+type MoveSearchResponse = { learned_by_pokemon: NamedApiResource[] };
+type MoveListResponse = { results: NamedApiResource[] };
 
-type MoveSearchResponse = {
-  learned_by_pokemon: NamedApiResource[];
-};
+/** Everything that matched: PokéAPI Pokémon names plus National Dex numbers. */
+export interface AttributeMatches {
+  names: Set<string>;
+  /** Default varieties (PokéAPI ids below 10000 equal the National Dex number). */
+  dexNumbers: Set<number>;
+  has: (slug: string) => boolean;
+}
 
-const cache = new Map<string, Set<string>>();
+export const POKEMON_TYPES = [
+  'normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground',
+  'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy',
+];
+
+const resultCache = new Map<string, AttributeMatches>();
+let moveListPromise: Promise<string[]> | null = null;
 
 function apiSlug(value: string) {
   return value
@@ -22,22 +32,102 @@ function apiSlug(value: string) {
     .replace(/^-+|-+$/g, '');
 }
 
-export function usePokemonAttributeSearch(mode: PokemonSearchMode, query: string) {
-  const normalized = useMemo(() => apiSlug(query), [query]);
-  const [matches, setMatches] = useState<Set<string> | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function idFromUrl(url: string) {
+  const match = url.match(/\/(\d+)\/?$/);
+  return match ? Number(match[1]) : null;
+}
+
+function buildMatches(resources: NamedApiResource[]): AttributeMatches {
+  const names = new Set(resources.map((resource) => resource.name));
+  const dexNumbers = new Set<number>();
+  for (const resource of resources) {
+    const id = idFromUrl(resource.url);
+    if (id != null && id < 10000) dexNumbers.add(id);
+  }
+  return { names, dexNumbers, has: (slug) => names.has(slug) };
+}
+
+/** All move names, fetched once per visit, for suggestions and partial typing. */
+function loadMoveList() {
+  if (!moveListPromise) {
+    moveListPromise = fetchPokeApiJson<MoveListResponse>('https://pokeapi.co/api/v2/move?limit=2000')
+      .then((result) => result.results.map((move) => move.name))
+      .catch((error) => {
+        moveListPromise = null;
+        throw error;
+      });
+  }
+  return moveListPromise;
+}
+
+/** Suggestions for the search box: move names or type names, human-readable. */
+export function useAttributeOptions(mode: PokemonSearchMode) {
+  const [moves, setMoves] = useState<string[]>([]);
 
   useEffect(() => {
-    if (mode === 'pokemon' || !normalized) {
+    if (mode !== 'move') return;
+    let active = true;
+    loadMoveList().then((list) => { if (active) setMoves(list); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [mode]);
+
+  return useMemo(() => {
+    if (mode === 'type') return POKEMON_TYPES.map(humanizeApiName);
+    if (mode === 'move') return moves.map(humanizeApiName);
+    return [];
+  }, [mode, moves]);
+}
+
+/**
+ * Resolves what the person typed to one move or type. Exact names win; if the
+ * text is the start of exactly one move ("ice be" → ice-beam) that is used too.
+ */
+function resolveSlug(mode: 'type' | 'move', typed: string, moveList: string[] | null) {
+  const slug = apiSlug(typed);
+  if (!slug) return { slug: null, hint: null };
+  const options = mode === 'type' ? POKEMON_TYPES : moveList;
+  if (!options) return { slug, hint: null }; // list not loaded yet: try it as typed
+  if (options.includes(slug)) return { slug, hint: null };
+  const starts = options.filter((option) => option.startsWith(slug));
+  if (starts.length === 1) return { slug: starts[0], hint: null };
+  if (starts.length > 1) return { slug: null, hint: `Keep typing: ${starts.length} ${mode === 'type' ? 'types' : 'moves'} start with “${typed.trim()}”.` };
+  return { slug: null, hint: `No ${mode} called “${typed.trim()}”.` };
+}
+
+export function usePokemonAttributeSearch(mode: PokemonSearchMode, query: string) {
+  const [moveList, setMoveList] = useState<string[] | null>(null);
+  const [matches, setMatches] = useState<AttributeMatches | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode !== 'move') return;
+    let active = true;
+    loadMoveList().then((list) => { if (active) setMoveList(list); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode === 'pokemon' || !query.trim()) {
       setMatches(null);
       setLoading(false);
       setError(null);
+      setResolved(null);
       return;
     }
 
-    const cacheKey = `${mode}:${normalized}`;
-    const cached = cache.get(cacheKey);
+    const { slug, hint } = resolveSlug(mode, query, mode === 'move' ? moveList : null);
+    setResolved(slug);
+    if (!slug) {
+      setMatches(null);
+      setLoading(false);
+      setError(hint);
+      return;
+    }
+
+    const cacheKey = `${mode}:${slug}`;
+    const cached = resultCache.get(cacheKey);
     if (cached) {
       setMatches(cached);
       setLoading(false);
@@ -49,35 +139,20 @@ export function usePokemonAttributeSearch(mode: PokemonSearchMode, query: string
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
-      setMatches(null);
-
       try {
-        const names = new Set<string>();
-        if (mode === 'type') {
-          const result = await fetchPokeApiJson<TypeSearchResponse>(
-            `https://pokeapi.co/api/v2/type/${encodeURIComponent(normalized)}/`,
-            controller.signal,
-          );
-          result.pokemon.forEach((row) => names.add(row.pokemon.name));
-        } else {
-          const result = await fetchPokeApiJson<MoveSearchResponse>(
-            `https://pokeapi.co/api/v2/move/${encodeURIComponent(normalized)}/`,
-            controller.signal,
-          );
-          result.learned_by_pokemon.forEach((row) => names.add(row.name));
-        }
-
-        if (!controller.signal.aborted) {
-          cache.set(cacheKey, names);
-          setMatches(names);
-        }
+        const resources = mode === 'type'
+          ? (await fetchPokeApiJson<TypeSearchResponse>(`https://pokeapi.co/api/v2/type/${slug}/`, controller.signal)).pokemon.map((row) => row.pokemon)
+          : (await fetchPokeApiJson<MoveSearchResponse>(`https://pokeapi.co/api/v2/move/${slug}/`, controller.signal)).learned_by_pokemon;
+        if (controller.signal.aborted) return;
+        const built = buildMatches(resources);
+        resultCache.set(cacheKey, built);
+        setMatches(built);
       } catch (loadError) {
         if (controller.signal.aborted) return;
-        setMatches(new Set());
-        const friendly = mode === 'type'
-          ? `No Pokémon type called “${query.trim()}” was found.`
-          : `No move called “${query.trim()}” was found.`;
-        setError(loadError instanceof Error && !loadError.message.includes('HTTP 404') ? loadError.message : friendly);
+        setMatches(null);
+        setError(loadError instanceof Error && loadError.message.includes('404')
+          ? `No ${mode} called “${query.trim()}”.`
+          : "Couldn't reach PokéAPI. Check your connection and try again.");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -87,7 +162,7 @@ export function usePokemonAttributeSearch(mode: PokemonSearchMode, query: string
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [mode, normalized, query]);
+  }, [mode, query, moveList]);
 
-  return { matches, loading, error, normalized };
+  return { matches, loading, error, resolved };
 }

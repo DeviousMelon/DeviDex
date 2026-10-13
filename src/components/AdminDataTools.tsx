@@ -383,7 +383,12 @@ export function AdminDataTools() {
         const species = speciesById.get(pokemon.speciesId);
         if (!species) return [];
 
-        const category = classifyForm(species.slug, detail, csv);
+        // Pyroar, Frillish and Jellicent have a real PokéAPI "female" form on
+        // the same Pokémon: that is purely cosmetic, so it is a gender slot.
+        // Meowstic, Indeedee, Basculegion and Oinkologne females are separate
+        // Pokémon with their own moves/stats and stay alternate forms.
+        const isCosmeticFemale = csv.formIdentifier === 'female' && pokemon.isDefault;
+        const category = isCosmeticFemale ? 'gender' as const : classifyForm(species.slug, detail, csv);
         const battleOnly = category === 'battle';
         const sourcePokemonId = pokemonIdFromUrl(detail.pokemon.url) ?? csv.pokemonId;
 
@@ -414,12 +419,20 @@ export function AdminDataTools() {
       // its sprite repository rather than always as Pokémon Form resources.
       // Add one synthetic Female slot for every species flagged as visually
       // gender-different. The normal species slot remains the other appearance.
+      // Species that already have a real female form from PokéAPI get no
+      // synthetic duplicate: the same slug twice in one upsert batch makes
+      // Postgres reject the whole batch, which silently dropped every female
+      // slot (Combee and the rest) in earlier imports.
+      const speciesWithRealFemale = new Set(
+        importedForms.filter((form) => /(^|-)female$/.test(form.slug)).map((form) => form.species_id),
+      );
+
       const genderRows = parseSimpleCsv(speciesCsvText)
         .filter((row) => row.has_gender_differences === '1')
         .flatMap((row) => {
           const speciesId = Number(row.id);
           const species = speciesById.get(speciesId);
-          if (!species) return [];
+          if (!species || speciesWithRealFemale.has(species.id)) return [];
 
           return [{
             species_id: species.id,
@@ -442,7 +455,13 @@ export function AdminDataTools() {
           }];
         });
 
-      const rows = [...importedForms, ...genderRows];
+      // Final safety net: one row per slug, first one wins.
+      const seenSlugs = new Set<string>();
+      const rows = [...importedForms, ...genderRows].filter((row) => {
+        if (seenSlugs.has(row.slug)) return false;
+        seenSlugs.add(row.slug);
+        return true;
+      });
 
       for (const [index, batch] of chunks(rows, 150).entries()) {
         setImportProgress(`Saving form batch ${index + 1} / ${Math.ceil(rows.length / 150)}…`);

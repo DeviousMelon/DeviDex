@@ -511,3 +511,50 @@ export async function restoreBackup(file: File, userId: string, mode: 'merge' | 
     version: 4 as const,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Clearing progress
+// ---------------------------------------------------------------------------
+
+export type ProgressGame = { id: number; name: string };
+
+export type ClearScope =
+  | { kind: 'national' }
+  | { kind: 'game'; gameId: number }
+  | { kind: 'all' };
+
+/** Games the signed-in person has started a Game Dex for. */
+export async function listProgressGames(userId: string): Promise<ProgressGame[]> {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data: activity, error } = await supabase.from('game_dex_activity').select('game_id').eq('user_id', userId);
+  if (error) throw new Error(error.message);
+  const ids = [...new Set((activity ?? []).map((row) => row.game_id as number))];
+  if (!ids.length) return [];
+  const { data: games, error: gamesError } = await supabase.from('games').select('id, name, release_order').in('id', ids).order('release_order');
+  if (gamesError) throw new Error(gamesError.message);
+  return (games ?? []).map((game) => ({ id: game.id as number, name: game.name as string }));
+}
+
+/**
+ * Deletes the person's own progress rows (RLS only allows their own). Saved
+ * collection setups, trade lists and the profile are left alone.
+ */
+export async function clearProgress(userId: string, scope: ClearScope) {
+  const client = supabase;
+  if (!client) throw new Error('Supabase is not configured.');
+
+  const run = async (table: string, gameId?: number) => {
+    let query = client.from(table).delete().eq('user_id', userId);
+    if (gameId != null) query = query.eq('game_id', gameId);
+    const { error } = await query;
+    if (error) throw new Error(error.message);
+  };
+
+  if (scope.kind === 'national' || scope.kind === 'all') await run('collection_progress');
+  if (scope.kind === 'game' || scope.kind === 'all') {
+    const gameId = scope.kind === 'game' ? scope.gameId : undefined;
+    await run('game_collection_progress', gameId);
+    await run('game_form_collection_progress', gameId);
+    await run('game_dex_activity', gameId);
+  }
+}

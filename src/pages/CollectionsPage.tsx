@@ -8,7 +8,8 @@ import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
 import { useDexCatalog } from '../hooks/useDexCatalog';
-import { usePokemonAttributeSearch, type PokemonSearchMode } from '../hooks/usePokemonAttributeSearch';
+import { useAttributeOptions, usePokemonAttributeSearch, type PokemonSearchMode } from '../hooks/usePokemonAttributeSearch';
+import { humanizeApiName } from '../lib/pokeapi';
 import { scrollToHashBox, storageOrder } from '../lib/boxes';
 import type { DexCatalogEntry, FormCategory } from '../types';
 
@@ -35,30 +36,38 @@ export function CollectionsPage() {
   const [searchMode, setSearchMode] = useState<PokemonSearchMode>('pokemon');
   const [saveError, setSaveError] = useState<string | null>(null);
   const attributeSearch = usePokemonAttributeSearch(searchMode, search);
+  const attributeOptions = useAttributeOptions(searchMode);
 
   const ordered = useMemo(() => storageOrder(catalog), [catalog]);
 
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
+    const { matches, error: attributeError } = attributeSearch;
+    // While a type/move lookup is still running, keep showing everything
+    // rather than flashing "Nothing matches".
+    const attributePending = searchMode !== 'pokemon' && Boolean(needle) && !matches && !attributeError;
     return ordered.filter((entry) => {
       const row = progress[entry.formId];
       const normal = row?.normalOwned ?? false;
       const shiny = row?.shinyOwned ?? false;
-      const matches = !needle
+      const hit = !needle || attributePending
         || (searchMode === 'pokemon'
           ? entry.speciesName.toLowerCase().includes(needle)
             || entry.formName.toLowerCase().includes(needle)
             || entry.formSlug.toLowerCase().includes(needle)
             || String(entry.dexNumber).includes(needle)
-          : Boolean(attributeSearch.matches?.has(entry.formSlug) || attributeSearch.matches?.has(entry.speciesSlug)));
-      if (!matches) return false;
+          : Boolean(matches && (
+            matches.has(entry.formSlug)
+            || (entry.isDefault && (matches.has(entry.speciesSlug) || matches.dexNumbers.has(entry.dexNumber)))
+          )));
+      if (!hit) return false;
       if (filter === 'missing') return !normal;
       if (filter === 'owned') return normal;
       if (filter === 'shiny-missing') return !shiny;
       if (filter === 'shiny-owned') return shiny;
       return true;
     });
-  }, [attributeSearch.matches, filter, ordered, progress, search, searchMode]);
+  }, [attributeSearch, filter, ordered, progress, search, searchMode]);
 
   // Arriving from a dashboard box (/national-dex#box-4) jumps to that box.
   useEffect(() => {
@@ -121,10 +130,13 @@ export function CollectionsPage() {
         onSearchMode={setSearchMode}
         filter={filter}
         onFilter={chooseFilter}
+        suggestions={attributeOptions}
         resultText={searchMode !== 'pokemon' && search.trim()
           ? attributeSearch.loading
             ? 'Checking…'
-            : attributeSearch.error ?? `${visible.length.toLocaleString()} match`
+            : attributeSearch.error ?? (attributeSearch.resolved && attributeSearch.matches
+              ? `${visible.length.toLocaleString()} ${searchMode === 'move' ? `can learn ${humanizeApiName(attributeSearch.resolved)}` : `${humanizeApiName(attributeSearch.resolved)} type`}`
+              : undefined)
           : boxed ? undefined : `${visible.length.toLocaleString()} shown`}
         resultIsError={Boolean(attributeSearch.error)}
       />

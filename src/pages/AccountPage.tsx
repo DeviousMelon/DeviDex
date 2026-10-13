@@ -3,6 +3,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import {
+  clearProgress,
+  listProgressGames,
+  type ProgressGame,
   downloadCsvBackup,
   downloadJsonBackup,
   inspectBackupFile,
@@ -64,6 +67,13 @@ export function AccountPage() {
   const [backupFileError, setBackupFileError] = useState<string | null>(null);
   const [dataMessage, setDataMessage] = useState<string | null>(null);
   const [dataBusy, setDataBusy] = useState(false);
+
+  // Clear progress
+  const [progressGames, setProgressGames] = useState<ProgressGame[]>([]);
+  const [clearTarget, setClearTarget] = useState('national');
+  const [clearConfirmation, setClearConfirmation] = useState('');
+  const [clearMessage, setClearMessage] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   // -----------------------------
   // Permanent deletion safeguard
@@ -333,6 +343,44 @@ export function AccountPage() {
     }
   }
 
+  useEffect(() => {
+    if (tab !== 'data' || !user) return;
+    let active = true;
+    listProgressGames(user.id)
+      .then((games) => { if (active) setProgressGames(games); })
+      .catch(() => { if (active) setProgressGames([]); });
+    return () => { active = false; };
+  }, [tab, user, clearing]);
+
+  const clearLabel = clearTarget === 'national'
+    ? 'your National Dex progress'
+    : clearTarget === 'all'
+      ? 'all your progress (National Dex and every Game Dex)'
+      : `your ${progressGames.find((game) => `game:${game.id}` === clearTarget)?.name ?? 'Game Dex'} progress`;
+
+  async function handleClearProgress() {
+    if (!user || clearConfirmation !== 'CLEAR') return;
+    setClearing(true);
+    setClearMessage(null);
+    try {
+      // Always leave a way back.
+      await downloadJsonBackup(user, profile, 'devidex-before-clearing');
+      const scope = clearTarget === 'national'
+        ? { kind: 'national' as const }
+        : clearTarget === 'all'
+          ? { kind: 'all' as const }
+          : { kind: 'game' as const, gameId: Number(clearTarget.slice(5)) };
+      await clearProgress(user.id, scope);
+      setClearMessage(`Cleared ${clearLabel}. A backup of what was there just downloaded, in case you change your mind.`);
+      setClearConfirmation('');
+      setClearTarget('national');
+    } catch (error) {
+      setClearMessage(error instanceof Error ? `Couldn't clear progress: ${error.message}` : "Couldn't clear progress.");
+    } finally {
+      setClearing(false);
+    }
+  }
+
   async function handleDeleteAccount() {
     if (!user || !supabase) return;
     if (deleteConfirmation !== 'DELETE') {
@@ -391,7 +439,7 @@ export function AccountPage() {
 
       {!needsSetup && (
         <div className="tabs" role="tablist" aria-label="Account sections">
-          {[['profile', 'Profile & privacy'], ['login', 'Login'], ['data', 'Backups'], ['delete', 'Delete account']].map(([value, label]) => (
+          {[['profile', 'Profile & privacy'], ['login', 'Login'], ['data', 'Your data'], ['delete', 'Delete account']].map(([value, label]) => (
             <button key={value} type="button" role="tab" aria-selected={tab === value} className={tab === value ? 'is-active' : undefined} onClick={() => chooseTab(value)}>
               {label}
             </button>
@@ -597,6 +645,33 @@ export function AccountPage() {
             </div>
 
             {dataMessage && <p className="form-message" role="status">{dataMessage}</p>}
+          </section>
+          )}
+
+          {tab === 'data' && (
+          <section className="account-card account-card--profile danger-zone clear-progress">
+            <h2>Clear progress</h2>
+            <p className="muted">Start a Dex over from scratch. Your profile, friends, trade list and saved setups stay put, and a backup downloads first so nothing is gone for good.</p>
+            <label className="clear-progress__field">
+              <span>What to clear</span>
+              <select value={clearTarget} onChange={(event) => { setClearTarget(event.target.value); setClearMessage(null); }}>
+                <option value="national">National Dex</option>
+                {progressGames.length > 0 && (
+                  <optgroup label="Game Dexes">
+                    {progressGames.map((game) => <option key={game.id} value={`game:${game.id}`}>{game.name}</option>)}
+                  </optgroup>
+                )}
+                <option value="all">Everything</option>
+              </select>
+            </label>
+            <label className="delete-confirm-field">
+              <span>Type <strong>CLEAR</strong> to confirm</span>
+              <input value={clearConfirmation} onChange={(event) => setClearConfirmation(event.target.value)} autoComplete="off" />
+            </label>
+            {clearMessage && <p className="form-message" role="status">{clearMessage}</p>}
+            <button className="button button--danger" type="button" disabled={clearing || clearConfirmation !== 'CLEAR'} onClick={() => void handleClearProgress()}>
+              {clearing ? 'Clearing…' : `Clear ${clearTarget === 'all' ? 'everything' : clearTarget === 'national' ? 'National Dex' : progressGames.find((game) => `game:${game.id}` === clearTarget)?.name ?? 'progress'}`}
+            </button>
           </section>
           )}
 
