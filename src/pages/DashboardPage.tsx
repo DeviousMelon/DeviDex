@@ -1,269 +1,238 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { BoxMosaic, BOX_SIZE, type CellState } from '../components/BoxMosaic';
 import { PokemonSprite } from '../components/PokemonSprite';
 import { useAuth } from '../context/AuthContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
+import { useSocial } from '../context/SocialContext';
 import { useDexCatalog } from '../hooks/useDexCatalog';
 import { useStartedGameDexes } from '../hooks/useStartedGameDexes';
-import type { DexStatus, ProgressCardData } from '../types';
+import { listForumPosts, type ForumPost } from '../lib/forums';
+import { timeAgo } from '../lib/social';
+import { collectionGoalLabel } from '../lib/collectionPresets';
+import { storageOrder } from '../lib/boxes';
 
-const formatDexNumber = (number: number) => `#${number.toString().padStart(4, '0')}`;
+const percent = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
 
-const statusLabel: Record<DexStatus, string> = {
-  owned: 'Owned',
-  missing: 'Missing',
-  shiny: 'Shiny',
-};
+export function DashboardPage() {
+  const { user } = useAuth();
+  return user ? <SignedInDashboard /> : <Landing />;
+}
 
-function ProgressCard({ card }: { card: ProgressCardData }) {
-  const percentage = card.total ? Math.round((card.current / card.total) * 100) : 0;
+// ---------------------------------------------------------------------------
+// Signed in: what you have, what's next, who's talking
+// ---------------------------------------------------------------------------
+
+function SignedInDashboard() {
+  const { profile } = useAuth();
+  const { goal, activeCollection, presetId } = useFormPreferences();
+  const { catalog, progress, stats, loading, error } = useDexCatalog();
+  const { startedGames, loading: gamesLoading } = useStartedGameDexes();
+  const { incomingRequests, unreadConversations } = useSocial();
+  const [posts, setPosts] = useState<ForumPost[] | null>(null);
+
+  useEffect(() => {
+    void listForumPosts(null, 'new', 0).then((result) => setPosts(result.data.filter((post) => !post.authorBlocked).slice(0, 4)));
+  }, []);
+
+  const ordered = useMemo(() => storageOrder(catalog), [catalog]);
+  const cells = useMemo<CellState[]>(() => ordered.map((entry) => {
+    const row = progress[entry.formId];
+    return row?.shinyOwned ? 'shiny' : row?.normalOwned ? 'owned' : 'missing';
+  }), [ordered, progress]);
+
+  const nextMissing = useMemo(
+    () => ordered.filter((entry) => !progress[entry.formId]?.normalOwned).slice(0, 6),
+    [ordered, progress],
+  );
+
+  const goalOwned = goal === 'shiny' ? stats.shinyOwned : goal === 'both' ? stats.livingOwned + stats.shinyOwned : stats.livingOwned;
+  const goalTotal = goal === 'both' ? stats.total * 2 : stats.total;
+  const collectionName = activeCollection?.name ?? (presetId === 'custom' ? 'Custom setup' : 'Your collection');
+  const name = profile?.display_name || profile?.username;
 
   return (
-    <article className={`progress-card progress-card--${card.tone}`}>
-      <div className="progress-card__topline">
-        <p>{card.label}</p>
-        <strong>{percentage}%</strong>
+    <main className="home">
+      <section className="home-hero" aria-labelledby="home-title">
+        <div className="home-hero__text">
+          <h1 id="home-title">{name ? `Welcome back, ${name}.` : 'Welcome back.'}</h1>
+          <p>
+            <Link to="/national-dex">{collectionName}</Link> · {collectionGoalLabel(goal)}
+          </p>
+        </div>
+
+        <div className="home-hero__score">
+          <strong>{percent(goalOwned, goalTotal)}<small>%</small></strong>
+          <span>{goalOwned.toLocaleString()} of {goalTotal.toLocaleString()} {goal === 'shiny' ? 'shinies' : 'slots'}</span>
+        </div>
+      </section>
+
+      <section className="home-boxes" aria-labelledby="boxes-title">
+        <div className="home-boxes__head">
+          <h2 id="boxes-title">Your boxes</h2>
+          <div className="box-legend" aria-hidden="true">
+            <span><i className="box-mosaic__cell box-mosaic__cell--owned" /> Owned</span>
+            <span><i className="box-mosaic__cell box-mosaic__cell--shiny" /> Shiny</span>
+            <span><i className="box-mosaic__cell box-mosaic__cell--missing" /> Missing</span>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="muted">Loading your collection…</p>
+        ) : error || cells.length === 0 ? (
+          <p className="muted">The Pokédex couldn't be loaded right now. Refresh to try again.</p>
+        ) : (
+          <BoxMosaic
+            cells={cells}
+            boxHref={(index) => `/national-dex#box-${index + 1}`}
+            firstNumberOfBox={(index) => ordered[index * BOX_SIZE]?.dexNumber ?? 0}
+          />
+        )}
+
+        <div className="stat-inline home-boxes__stats">
+          <div><strong>{stats.livingOwned.toLocaleString()}</strong><span>owned of {stats.total.toLocaleString()}</span></div>
+          <div className="is-shiny"><strong>{stats.shinyOwned.toLocaleString()}</strong><span>shiny</span></div>
+          <div><strong>{Math.max(stats.total - stats.livingOwned, 0).toLocaleString()}</strong><span>still missing</span></div>
+          {stats.alternateForms > 0 && <div><strong>{stats.alternateForms.toLocaleString()}</strong><span>extra forms tracked</span></div>}
+        </div>
+      </section>
+
+      <div className="home-grid">
+        <section className="panel" aria-labelledby="next-title">
+          <div className="panel__head">
+            <h2 id="next-title">Next to find</h2>
+            <Link to="/national-dex?filter=missing">All missing</Link>
+          </div>
+          {nextMissing.length === 0 ? (
+            <p className="muted">{loading ? 'Loading…' : 'Nothing missing. Go and touch some grass.'}</p>
+          ) : (
+            <ul className="mini-dex">
+              {nextMissing.map((entry) => (
+                <li key={entry.formId}>
+                  <Link to={`/pokemon/${entry.speciesSlug}${entry.isDefault ? '' : `?form=${encodeURIComponent(entry.formSlug)}`}`}>
+                    <PokemonSprite nationalDexNumber={entry.dexNumber} name={entry.speciesName} spriteUrl={entry.spriteUrl} shinySpriteUrl={entry.shinySpriteUrl} />
+                    <span>#{String(entry.dexNumber).padStart(4, '0')}</span>
+                    <strong>{entry.isDefault ? entry.speciesName : entry.formName}</strong>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="panel" aria-labelledby="games-title">
+          <div className="panel__head">
+            <h2 id="games-title">Game Dexes in progress</h2>
+            <Link to="/games">All games</Link>
+          </div>
+          {gamesLoading ? (
+            <p className="muted">Loading…</p>
+          ) : startedGames.length === 0 ? (
+            <p className="muted">
+              None yet. Tick a Pokémon in any <Link to="/games">Game Dex</Link> and it shows up here.
+            </p>
+          ) : (
+            <ul className="row-list">
+              {startedGames.slice(0, 5).map((game) => (
+                <li key={game.id}>
+                  <Link to={`/games/${game.slug}?version=${game.gameSlug}`}>
+                    <span className="row-list__main">
+                      <strong>{game.name}</strong>
+                      <small>{game.gameName.replace(/^Pokémon\s*/i, '')}{game.scopeType === 'dlc' ? ' (DLC)' : ''}</small>
+                    </span>
+                    <span className="row-list__meter" aria-label={`${game.livingOwned} of ${game.total}`}>
+                      <span className="meter"><span style={{ width: `${percent(game.livingOwned, game.total)}%` }} /></span>
+                      <small>{game.livingOwned}/{game.total}</small>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="panel" aria-labelledby="social-title">
+          <div className="panel__head">
+            <h2 id="social-title">Friends & forums</h2>
+            <Link to="/forums">Forums</Link>
+          </div>
+          {(incomingRequests > 0 || unreadConversations > 0) && (
+            <div className="home-alerts">
+              {incomingRequests > 0 && (
+                <Link to="/friends"><span className="badge">{incomingRequests}</span> friend {incomingRequests === 1 ? 'request' : 'requests'} waiting</Link>
+              )}
+              {unreadConversations > 0 && (
+                <Link to="/chat"><span className="badge">{unreadConversations}</span> {unreadConversations === 1 ? 'chat' : 'chats'} with new messages</Link>
+              )}
+            </div>
+          )}
+          {posts == null ? (
+            <p className="muted">Loading…</p>
+          ) : posts.length === 0 ? (
+            <p className="muted">The forums are quiet. <Link to="/forums/new">Start a thread</Link>.</p>
+          ) : (
+            <ul className="row-list row-list--posts">
+              {posts.map((post) => (
+                <li key={post.id}>
+                  <Link to={`/forums/post/${post.id}`}>
+                    <span className="row-list__main">
+                      <strong>{post.title}</strong>
+                      <small>{post.categoryName} · {post.commentCount} {post.commentCount === 1 ? 'reply' : 'replies'} · {timeAgo(post.createdAt)}</small>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
-      <div className="progress-track" aria-label={`${card.label}: ${percentage}% complete`}>
-        <span style={{ '--progress': `${percentage}%` } as CSSProperties} />
-      </div>
-      <div className="progress-card__numbers">
-        <strong>{card.current.toLocaleString()}</strong>
-        <span>/ {card.total.toLocaleString()}</span>
-      </div>
-      <p className="muted">{card.detail}</p>
-    </article>
+    </main>
   );
 }
 
-export function DashboardPage() {
-  const { user, profile } = useAuth();
-  const { goal, activeCollection, presetId } = useFormPreferences();
-  const { catalog, progress, stats, loading } = useDexCatalog();
-  const { startedGames, loading: startedGamesLoading } = useStartedGameDexes();
+// ---------------------------------------------------------------------------
+// Signed out: what DeviDex is, in one look
+// ---------------------------------------------------------------------------
 
-  const databaseReady = catalog.length > 0;
+// A deterministic, decorative collection for the hero illustration only.
+const DEMO_CELLS: CellState[] = Array.from({ length: BOX_SIZE * 6 }, (_, index) => {
+  const n = (index * 7919) % 97;
+  if (index > 150) return n % 3 === 0 ? 'owned' : 'missing';
+  return n % 13 === 0 ? 'shiny' : n % 5 === 0 ? 'missing' : 'owned';
+});
 
-  // Public visitors now see the REAL catalogue and can mark temporary progress,
-  // so there is no need to fake a sample collection once the database exists.
-  const progressCards: ProgressCardData[] = databaseReady
-    ? [
-        {
-          label: 'National Living Dex',
-          current: stats.livingOwned,
-          total: stats.total,
-          detail: `${Math.max(stats.total - stats.livingOwned, 0)} entries remaining`,
-          tone: 'blue',
-        },
-        {
-          label: 'Shiny Living Dex',
-          current: stats.shinyOwned,
-          total: stats.total,
-          detail: `${Math.max(stats.total - stats.shinyOwned, 0)} shinies remaining`,
-          tone: 'gold',
-        },
-        {
-          label: 'Extra Forms Included',
-          current: stats.alternateForms,
-          total: Math.max(stats.availableAlternateForms, 1),
-          detail: stats.availableAlternateForms
-            ? `${stats.availableAlternateForms - stats.alternateForms} optional form slots currently excluded`
-            : 'No optional forms are available yet',
-          tone: 'orange',
-        },
-      ]
-    // Never show made-up numbers: until the catalogue arrives, show empty
-    // cards that say so (the old demo figures could pass for real progress).
-    : ['National Living Dex', 'Shiny Living Dex', 'Extra Forms Included'].map((label, index) => ({
-        label,
-        current: 0,
-        total: 0,
-        detail: loading ? 'Loading your collection…' : 'Could not load the Pokédex right now',
-        tone: (['blue', 'gold', 'orange'] as const)[index],
-      }));
-
-  const recentPokemon = databaseReady
-    ? catalog.slice(0, 12).map((entry) => {
-        const row = progress[entry.formId];
-        const status: DexStatus = row?.shinyOwned
-          ? 'shiny'
-          : row?.normalOwned
-            ? 'owned'
-            : 'missing';
-        return {
-          formId: entry.formId,
-          dexNumber: entry.dexNumber,
-          name: entry.isDefault ? entry.speciesName : `${entry.speciesName} · ${entry.formName}`,
-          status,
-          spriteUrl: entry.spriteUrl,
-          shinySpriteUrl: entry.shinySpriteUrl,
-        };
-      })
-    : [];
-
-  const goalOwned = goal === 'shiny'
-    ? stats.shinyOwned
-    : goal === 'both'
-      ? stats.livingOwned + stats.shinyOwned
-      : stats.livingOwned;
-  const goalTotal = goal === 'both' ? stats.total * 2 : stats.total;
-  const overallPercent = goalTotal
-    ? Math.round((goalOwned / goalTotal) * 100)
-    : 0;
-  const activeCollectionLabel = activeCollection?.name
-    ?? (presetId === 'custom' ? 'Custom collection' : 'Current collection');
-
+function Landing() {
   return (
-    <main id="top">
-      <section className="hero" id="dashboard">
-        <div className="hero__copy">
-          <p className="eyebrow">YOUR COLLECTION, PROPERLY TRACKED</p>
-          <h1>The Living Dex tracker built for collectors.</h1>
-          <p className="hero__intro">
-            Track species, shinies, forms and game-specific collections without turning
-            your spreadsheet into a second full-time job.
+    <main className="landing">
+      <section className="landing-hero">
+        <div className="landing-hero__text">
+          <h1>Your Living Dex, box by box.</h1>
+          <p>
+            Tick off every species, shiny and form in the order you actually store them. Follow each
+            game's own Pokédex, keep backups, and trade with friends who are filling theirs.
           </p>
-
-          <div className="hero__actions">
-            <Link className="button button--primary" to="/national-dex">Open National Dex</Link>
-            <Link className="button button--secondary" to="/national-dex?filter=missing">View Missing</Link>
+          <div className="landing-hero__actions">
+            <Link className="button button--primary" to="/national-dex">Start tracking</Link>
+            <Link className="button button--secondary" to="/login">Create a free account</Link>
           </div>
-          {!user && (
-            <p className="hero__account-note">
-              Guest progress works for this session only. <Link to="/login">Create an account</Link> when you want it saved.
-            </p>
-          )}
+          <p className="landing-hero__note">No account needed to try it. Sign up to keep your progress.</p>
         </div>
-
-        <aside className="hero-summary" aria-label="Collection summary">
-          <div className="hero-summary__icon" aria-hidden="true">✓</div>
-          <p className="eyebrow">{user ? activeCollectionLabel.toUpperCase() : 'GUEST SESSION'}</p>
-          <strong>{databaseReady ? `${overallPercent}%` : profile?.username || '—'}</strong>
-          <span>{databaseReady
-            ? goal === 'shiny'
-              ? `${stats.shinyOwned} of ${stats.total} shiny entries completed`
-              : goal === 'both'
-                ? `${stats.livingOwned + stats.shinyOwned} of ${stats.total * 2} living + shiny goals completed`
-                : `${stats.livingOwned} of ${stats.total} Living Dex entries owned`
-            : loading ? 'Loading the National Dex…' : 'National Dex data is not ready yet'}</span>
-          <div className="hero-summary__footer">
-            <span>{user ? 'Cloud progress enabled' : 'Temporary progress only'}</span>
-            <span className="sparkle">✦</span>
-          </div>
-        </aside>
+        <BoxMosaic cells={DEMO_CELLS} animate className="landing-hero__mosaic" />
       </section>
 
-      <section className="section" id="progress">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">COLLECTION OVERVIEW</p>
-            <h2>{user ? 'Your progress' : 'Your guest-session progress'}</h2>
-          </div>
+      <section className="landing-points" aria-label="What DeviDex does">
+        <div>
+          <h2>Every form, your rules</h2>
+          <p>Regional forms, Vivillon patterns, gender differences, Megas: switch on only what counts for your Dex.</p>
         </div>
-        <div className="progress-grid">
-          {progressCards.map((card) => <ProgressCard card={card} key={card.label} />)}
+        <div>
+          <h2>Each game's own Pokédex</h2>
+          <p>Track Scarlet and Violet, Sword and Shield and the rest separately, with DLC Dexes kept apart.</p>
         </div>
-      </section>
-
-      <section className="section" id="living-dex">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">NATIONAL DEX</p>
-            <h2>See the collection at a glance</h2>
-          </div>
-          <div className="legend" aria-label="Collection status legend">
-            <span><i className="legend-dot" /> Owned</span>
-            <span><i className="legend-dot legend-dot--shiny" /> Shiny</span>
-            <span><i className="legend-dot legend-dot--missing" /> Missing</span>
-          </div>
+        <div>
+          <h2>Built for trading</h2>
+          <p>Compare collections with friends, list your spares, and share a Pokémon straight into chat.</p>
         </div>
-
-        {recentPokemon.length > 0 ? (
-          <div className="pokemon-grid">
-            {recentPokemon.map((pokemon) => {
-              const showShiny = pokemon.status === 'shiny';
-
-              return (
-                <Link
-                  className={`pokemon-tile pokemon-tile--${pokemon.status}`}
-                  key={pokemon.formId}
-                  to="/national-dex"
-                  aria-label={`${pokemon.name}, ${statusLabel[pokemon.status]}`}
-                >
-                  <span className="pokemon-tile__number">{formatDexNumber(pokemon.dexNumber)}</span>
-
-                  <span className="pokemon-tile__visual">
-                    {/* No initials behind transparent pixels. Fallback only appears on a real image error. */}
-                    <PokemonSprite
-                      className="pokemon-tile__sprite"
-                      nationalDexNumber={pokemon.dexNumber}
-                      name={pokemon.name}
-                      shiny={showShiny}
-                      spriteUrl={pokemon.spriteUrl}
-                      shinySpriteUrl={pokemon.shinySpriteUrl}
-                    />
-                    {showShiny && <span className="pokemon-tile__sparkle" aria-hidden="true">✦</span>}
-                  </span>
-
-                  <strong>{pokemon.name}</strong>
-                  <span className="pokemon-tile__status">{statusLabel[pokemon.status]}</span>
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <section className="dex-empty-state"><strong>Loading Pokémon sprites…</strong></section>
-        )}
-
-        <Link className="button button--wide" to="/national-dex">Open full National Dex</Link>
-      </section>
-
-      <section className="split-grid">
-        <article className="feature-card">
-          <div>
-            <p className="eyebrow">ACTIVE HUNT</p>
-            <h2>Shiny target</h2>
-            <p className="muted">Hunt tracking has its place reserved; we are leaving the feature alone until the core public Dex is further along.</p>
-          </div>
-          <div className="hunt-target">
-            <span className="hunt-target__star">✦</span>
-            <div>
-              <strong>Hunt tracking arrives later</strong>
-              <span>Targets, counters and game methods</span>
-            </div>
-            <Link to="/hunts">Hunts</Link>
-          </div>
-        </article>
-
-        <article className="feature-card">
-          <div>
-            <p className="eyebrow">YOUR GAME COLLECTIONS</p>
-            <h2>Started Game Dexes</h2>
-            <p className="muted">Only games where you have actually marked at least one Pokémon appear here.</p>
-          </div>
-
-          {startedGamesLoading ? (
-            <p className="muted">Loading started games…</p>
-          ) : startedGames.length > 0 ? (
-            <div className="started-game-list">
-              {startedGames.slice(0, 6).map((game) => (
-                <Link className="started-game-row" to={`/games/${game.slug}?version=${game.gameSlug}`} key={game.id}>
-                  <span>
-                    <strong>{game.name}</strong>
-                    <small>Gen {game.generation}{game.scopeType === 'dlc' ? ' · DLC' : ''} · {game.gameName.replace(/^Pokémon\s*/i, '')} · {game.livingOwned} owned{game.shinyOwned ? ` · ${game.shinyOwned} shiny` : ''}</small>
-                  </span>
-                  <strong aria-hidden="true">→</strong>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="started-games-empty">
-              <strong>No Game Dexes started yet.</strong>
-              <p>Mark one Pokémon in any Game Dex and that game will appear here.</p>
-              <Link className="button button--secondary" to="/games">Browse Game Dexes</Link>
-            </div>
-          )}
-        </article>
       </section>
     </main>
   );

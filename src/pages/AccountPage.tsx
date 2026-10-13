@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import {
   downloadCsvBackup,
@@ -27,6 +28,9 @@ export function AccountPage() {
     deleteAccount,
   } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = (['profile', 'login', 'data', 'delete'] as const).find((value) => value === searchParams.get('tab')) ?? 'profile';
+  const chooseTab = (value: string) => setSearchParams(value === 'profile' ? {} : { tab: value }, { replace: true });
 
   // -----------------------------
   // Public profile fields
@@ -377,23 +381,35 @@ export function AccountPage() {
   }[availability];
 
   return (
-    <main className="account-page account-page--settings">
-      <section className="account-card account-card--profile">
-        <div className="account-heading-row">
-          <div>
-            <p className="eyebrow">{needsSetup ? 'QUICK PROFILE SETUP' : 'PROFILE & PRIVACY'}</p>
-            <h1>{needsSetup ? 'Set up the useful bits.' : (profile?.display_name || profile?.username || 'Collector')}</h1>
-            <p className="muted">
-              {needsSetup
-                ? 'Choose a unique username. Everything else here is optional and can be changed later.'
-                : 'Control what other DeviDex users can see without handing the site information it has no business collecting.'}
-            </p>
-          </div>
+    <main className="account">
+      <PageHeader
+        title={needsSetup ? 'Set up your profile' : 'Account & privacy'}
+        description={needsSetup
+          ? 'Pick a username so friends can find you. Everything else is optional and can be changed later.'
+          : 'Your profile, what others can see, your login and your data.'}
+      />
 
+      {!needsSetup && (
+        <div className="tabs" role="tablist" aria-label="Account sections">
+          {[['profile', 'Profile & privacy'], ['login', 'Login'], ['data', 'Backups'], ['delete', 'Delete account']].map(([value, label]) => (
+            <button key={value} type="button" role="tab" aria-selected={tab === value} className={tab === value ? 'is-active' : undefined} onClick={() => chooseTab(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {(needsSetup || tab === 'profile') && (
+      <section className="account-card account-card--profile">
+        <div className="account-identity">
           <div className="profile-avatar-large" aria-label="Current profile picture">
             {currentAvatar
               ? <img src={currentAvatar} alt="Your DeviDex profile" />
               : <span>{(profile?.username || user?.email || 'DV').slice(0, 2).toUpperCase()}</span>}
+          </div>
+          <div>
+            <h2>{profile?.display_name || profile?.username || 'New collector'}</h2>
+            <p className="muted">{profile?.username ? `@${profile.username}` : 'No username yet'}</p>
           </div>
         </div>
 
@@ -488,13 +504,14 @@ export function AccountPage() {
           </div>
         </form>
       </section>
+      )}
 
       {!needsSetup && (
         <>
+          {tab === 'login' && (
           <section className="account-card account-card--profile">
-            <p className="eyebrow">SECURITY</p>
-            <h2>Login details</h2>
-            <p className="muted">Supabase handles passwords and email verification. DeviDex never stores your plaintext password.</p>
+            <h2>Email and password</h2>
+            <p className="muted">Changing your email sends a confirmation link to the new address.</p>
 
             <div className="account-settings-grid">
               <form className="settings-form" onSubmit={handleEmailChange}>
@@ -523,11 +540,12 @@ export function AccountPage() {
             {securityMessage && <p className="form-message" role="status">{securityMessage}</p>}
             <button className="text-button account-signout" type="button" onClick={handleSignOut}>Sign out</button>
           </section>
+          )}
 
+          {tab === 'data' && (
           <section className="account-card account-card--profile">
-            <p className="eyebrow">YOUR DATA</p>
-            <h2>Your collection should never be trapped here.</h2>
-            <p className="muted">Download a proper restorable JSON backup whenever you want. CSV is included for spreadsheets and human inspection.</p>
+            <h2>Backups</h2>
+            <p className="muted">Download a backup you can restore any time, or a CSV to open in a spreadsheet. Your collection is yours.</p>
 
             <div className="data-action-row">
               <button className="button button--primary" type="button" disabled={dataBusy} onClick={() => void handleDownloadJson()}>Download JSON backup</button>
@@ -580,13 +598,17 @@ export function AccountPage() {
 
             {dataMessage && <p className="form-message" role="status">{dataMessage}</p>}
           </section>
+          )}
 
+          {tab === 'delete' && (
           <section className="account-card account-card--profile danger-zone">
-            <p className="eyebrow">DANGER ZONE</p>
-            <h2>Delete DeviDex account</h2>
-            <p className="muted">This permanently deletes your authentication account, profile, National Dex progress and Game Dex progress. Export first if you want a copy.</p>
+            <h2>Delete your account</h2>
+            <p className="muted">
+              This permanently deletes your login, profile, friends, chats and all collection progress. It can't be undone.
+              {' '}<button className="text-button" type="button" onClick={() => chooseTab('data')}>Download a backup first</button> if you might come back.
+            </p>
             <label className="delete-confirm-field">
-              Type <strong>DELETE</strong> to confirm
+              <span>Type <strong>DELETE</strong> to confirm</span>
               <input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" />
             </label>
             {deleteMessage && <p className="form-message" role="status">{deleteMessage}</p>}
@@ -594,6 +616,7 @@ export function AccountPage() {
               {deleting ? 'Deleting…' : 'Permanently delete account'}
             </button>
           </section>
+          )}
         </>
       )}
     </main>

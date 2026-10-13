@@ -671,8 +671,7 @@ export function AdminDataTools() {
     <section className="section admin-section admin-data-tools">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">MASTER DATA</p>
-          <h2>Living Dex database</h2>
+          <h2>Pokédex data</h2>
           <p className="muted">Shared data is public-readable, but only an admin can change it.</p>
         </div>
         <button className="button button--secondary" type="button" onClick={() => void loadCounts()}>

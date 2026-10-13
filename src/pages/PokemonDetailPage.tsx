@@ -418,7 +418,7 @@ export function PokemonDetailPage() {
     return (
       <main className="pokemon-detail-page">
         <section className="pokemon-detail-error">
-          <p className="eyebrow">POKÉMON</p>
+          <p className="eyebrow">Pokémon</p>
           <h1>That entry wandered off.</h1>
           <p>{error ?? 'No trackable form exists for this species.'}</p>
           <Link className="button button--primary" to="/national-dex">Back to National Dex</Link>
@@ -487,7 +487,7 @@ export function PokemonDetailPage() {
         </div>
 
         <div className="pokemon-detail-intro">
-          <p className="eyebrow">INTRODUCED GENERATION {species.generation} · {categoryLabels[selectedForm.form_category]}</p>
+          <p className="eyebrow">Generation {species.generation} · {categoryLabels[selectedForm.form_category]}</p>
           <h1>{displayName}</h1>
           <p className="pokemon-detail-genus">{genus}</p>
 
@@ -533,7 +533,7 @@ export function PokemonDetailPage() {
       <section className="pokemon-detail-grid" id="overview">
         <article className="pokemon-info-card">
           <div className="pokemon-info-card__heading">
-            <p className="eyebrow">BATTLE PROFILE · GENERATION {gameContext.generation}</p>
+            <p className="eyebrow">Battle profile · Generation {gameContext.generation}</p>
             <h2>Types & abilities</h2>
           </div>
           <div className="pokemon-detail-fact-list">
@@ -558,7 +558,7 @@ export function PokemonDetailPage() {
 
         <article className="pokemon-info-card">
           <div className="pokemon-info-card__heading">
-            <p className="eyebrow">SPECIES</p>
+            <p className="eyebrow">Species</p>
             <h2>General details</h2>
           </div>
           <div className="pokemon-detail-fact-list pokemon-detail-fact-list--two-column">
@@ -582,7 +582,7 @@ export function PokemonDetailPage() {
       <section className="pokemon-info-card pokemon-stats-card">
         <div className="pokemon-info-card__heading pokemon-info-card__heading--inline">
           <div>
-            <p className="eyebrow">BASE STATS · GENERATION {gameContext.generation}</p>
+            <p className="eyebrow">Base stats · Generation {gameContext.generation}</p>
             <h2>Stat spread</h2>
           </div>
           {totalStats != null && <strong>BST {totalStats}</strong>}
@@ -604,7 +604,7 @@ export function PokemonDetailPage() {
       {evolutionLoading && (
         <section className="pokemon-info-card pokemon-evolution-card">
           <div className="pokemon-info-card__heading">
-            <p className="eyebrow">EVOLUTION</p>
+            <p className="eyebrow">Evolution</p>
             <h2>Loading evolution chain…</h2>
           </div>
         </section>
@@ -623,7 +623,7 @@ export function PokemonDetailPage() {
       {!evolutionLoading && evolutionError && (
         <section className="pokemon-info-card pokemon-evolution-card">
           <div className="pokemon-info-card__heading">
-            <p className="eyebrow">EVOLUTION</p>
+            <p className="eyebrow">Evolution</p>
             <h2>Evolution data unavailable</h2>
           </div>
           <p className="pokemon-detail-source-state pokemon-detail-source-state--warning">
@@ -643,7 +643,7 @@ export function PokemonDetailPage() {
       <section className="pokemon-info-card pokemon-forms-card">
         <div className="pokemon-info-card__heading pokemon-info-card__heading--inline">
           <div>
-            <p className="eyebrow">FORMS</p>
+            <p className="eyebrow">Forms</p>
             <h2>{forms.length === 1 ? 'This species has one DeviDex slot' : `${forms.length} DeviDex form slots`}</h2>
           </div>
           <span>Information pages show all catalogue forms, even when a form category is disabled in your active collection.</span>

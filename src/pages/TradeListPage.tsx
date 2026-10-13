@@ -59,11 +59,10 @@ export function TradeListPage() {
     <main className="social-page">
       <section className="social-hero">
         <div>
-          <p className="eyebrow">TRADE LIST</p>
-          <h1>Your spares.</h1>
+          <h1>Trade list</h1>
           <p className="muted">
-            Pokémon you can give away. When a friend <Link to="/friends">compares collections</Link> with you,
-            anything here that they're missing shows up as a trade match.
+            Spare Pokémon you can give away. When a friend <Link to="/friends">compares collections</Link> with you,
+            anything here they're missing shows up as a trade match.
           </p>
         </div>
         <div>

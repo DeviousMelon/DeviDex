@@ -49,7 +49,7 @@ export function PokemonGameContextSelector({ context, speciesGeneration, onChang
     <section className="pokemon-game-context" aria-labelledby="pokemon-game-context-title">
       <div className="pokemon-game-context__heading">
         <div>
-          <p className="eyebrow">VIEWING GAME DATA</p>
+          <p className="eyebrow">Showing game data</p>
           <h2 id="pokemon-game-context-title">Generation {generationRoman[context.generation]} · {selectedContext.label}</h2>
           <p>
             Exact version: <strong>{selectedVersion.label}</strong>. Moves and evolution rules below follow this context; locations and other game-specific sections will plug into the same selector.

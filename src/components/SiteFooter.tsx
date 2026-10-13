@@ -1,31 +1,30 @@
+import { Link } from 'react-router-dom';
+
 export function SiteFooter() {
   return (
-    <footer className="site-footer">
-      <div className="site-footer__brand">
-        <img src="/assets/logos/devidex-symbol.svg" alt="" aria-hidden="true" />
-        <div>
+    <footer className="footer">
+      <div className="footer__inner">
+        <div className="footer__brand">
+          <img src="/assets/logos/devidex-symbol.svg" alt="" aria-hidden="true" width="28" height="28" />
           <strong>DeviDex</strong>
-          <span>Track · Hunt · Complete</span>
         </div>
-      </div>
 
-      {/*
-        This wording deliberately says what DeviDex is and is not without
-        pretending that a footer magically grants us a licence to third-party
-        artwork. The sprite/image rights remain with their respective owners.
-      */}
-      <p className="site-footer__legal">
-        DeviDex is an unofficial, fan-made collection tracker and is not affiliated
-        with or endorsed by Nintendo, Game Freak, Creatures Inc. or The Pokémon Company.
-        Pokémon names, characters, images and sprites remain the property of their
-        respective rights holders. Sprites are displayed for identification and
-        reference purposes.
-      </p>
+        <nav className="footer__links" aria-label="Footer">
+          <Link to="/national-dex">National Dex</Link>
+          <Link to="/games">Game Dexes</Link>
+          <Link to="/forums">Forums</Link>
+          <a href="mailto:devidex314@gmail.com">Report a bug or bad Dex entry</a>
+        </nav>
 
-      <div className="site-footer__contact">
-        <span>Found a bug, bad Dex entry or other issue?</span>
-        <a href="mailto:devidex314@gmail.com">devidex314@gmail.com</a>
-        <small>Sprite imagery served via the PokéAPI sprite repository.</small>
+        {/*
+          Says what DeviDex is and is not, without pretending a footer grants a
+          licence to third-party artwork. Sprite rights stay with their owners.
+        */}
+        <p className="footer__legal">
+          DeviDex is an unofficial fan-made tracker, not affiliated with or endorsed by Nintendo,
+          Game Freak, Creatures Inc. or The Pokémon Company. Pokémon names and sprites belong to their
+          respective owners and are shown for identification. Sprites via the PokéAPI sprite repository.
+        </p>
       </div>
     </footer>
   );

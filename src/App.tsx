@@ -46,7 +46,7 @@ function App() {
         {/* Public user pages. */}
         <Route path="/u/:username" element={<PublicProfilePage />} />
 
-        <Route path="/hunts" element={<PlaceholderPage eyebrow="HUNTS" title="Shiny hunt tracker" description="Active hunts, counters and targets will eventually be managed from this route." />} />
+        <Route path="/hunts" element={<PlaceholderPage title="Shiny hunts are coming" description="Encounter counters, odds and targets for each game. Not ready yet." />} />
 
         {/* Social (v1.6–v1.9). Forums are readable signed out; the rest need an account. */}
         <Route path="/friends" element={<ProtectedRoute><FriendsPage /></ProtectedRoute>} />
@@ -62,7 +62,7 @@ function App() {
         <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
 
-        <Route path="*" element={<PlaceholderPage eyebrow="404" title="That page escaped the Dex." description="The route does not exist yet." />} />
+        <Route path="*" element={<PlaceholderPage title="Page not found" description="That page escaped the Dex. Check the address, or head back home." />} />
       </Routes>
 
       <SiteFooter />

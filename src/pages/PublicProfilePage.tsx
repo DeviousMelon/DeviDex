@@ -75,7 +75,6 @@ export function PublicProfilePage() {
         <div className="profile-avatar-large profile-avatar-large--public">
           {avatar ? <img src={avatar} alt={`${profile.username}'s profile`} /> : <span>{profile.username.slice(0, 2).toUpperCase()}</span>}
         </div>
-        <p className="eyebrow">DEVIDEX COLLECTOR</p>
         <h1>{profile.display_name || profile.username}</h1>
         <p className="profile-handle">@{profile.username}</p>
 
@@ -103,16 +102,14 @@ export function PublicProfilePage() {
             <div>
               <span>Started Game Dexes</span>
               <strong>{summary.started_game_dexes.toLocaleString()}</strong>
-              <small>Only a count is shared</small>
+              <small>in progress</small>
             </div>
           </div>
         )}
 
-        <p className="muted">
-          {profile.collection_public
-            ? 'This collector chose to share a summary only. Individual collection rows and notes remain private.'
-            : 'This collector keeps their collection progress private.'}
-        </p>
+        {!profile.collection_public && (
+          <p className="muted">{profile.display_name || profile.username} keeps their collection private.</p>
+        )}
       </section>
     </main>
   );

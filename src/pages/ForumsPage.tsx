@@ -69,8 +69,7 @@ export function ForumsPage() {
       <section className="forum-feed">
         <header className="forum-feed__header">
           <div>
-            <p className="eyebrow">{current ? 'FORUM' : 'FORUMS'}</p>
-            <h1>{current?.name ?? 'Community'}</h1>
+            <h1>{current?.name ?? 'Forums'}</h1>
             <p className="muted">{current?.description ?? 'Trades, hunts, showcases and help from other collectors.'}</p>
           </div>
           {user ? (

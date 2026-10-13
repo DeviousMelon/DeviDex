@@ -220,7 +220,7 @@ export function MoveLearnset({
     <section className="pokemon-info-card pokemon-moves-card" id="moves">
       <div className="pokemon-info-card__heading pokemon-info-card__heading--inline pokemon-moves-card__heading">
         <div>
-          <p className="eyebrow">MOVES · {versionGroupLabel(versionGroup)}</p>
+          <p className="eyebrow">Moves · {versionGroupLabel(versionGroup)}</p>
           <h2>Learnset</h2>
           <p>The game context above controls this entire learnset. Each learning method gets its own tab by default.</p>
         </div>

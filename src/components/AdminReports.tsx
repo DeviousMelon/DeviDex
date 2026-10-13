@@ -69,7 +69,6 @@ export function AdminReports() {
     <section className="section admin-section admin-reports">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">MODERATION</p>
           <h2>Reports</h2>
           <p className="muted">What people have flagged. The reported person is never told who reported them.</p>
         </div>
