@@ -17,3 +17,6 @@ dist/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Windows folder settings
+Desktop.ini

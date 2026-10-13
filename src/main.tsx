@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import { GuestProgressProvider } from './context/GuestProgressContext';
+import { FormPreferencesProvider } from './context/FormPreferencesContext';
 import './styles.css';
 
 const rootElement = document.getElementById('root');
@@ -14,7 +16,13 @@ createRoot(rootElement).render(
     <BrowserRouter>
       {/* AuthProvider exposes the Supabase session to every route below it. */}
       <AuthProvider>
-        <App />
+        {/* Form rules are account-saved for users and in-memory for guests. */}
+        <FormPreferencesProvider>
+          {/* Guest progress lives only for this open browser session. */}
+          <GuestProgressProvider>
+            <App />
+          </GuestProgressProvider>
+        </FormPreferencesProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
