@@ -27,3 +27,27 @@ server-side, one-time owner action.
 The Vite browser app should use only the Supabase **publishable/anon** key. A
 service-role key bypasses Row Level Security and must never be placed in frontend
 source code, GitHub, or client-side Cloudflare environment variables.
+
+## v1.6–v1.9: friends, chat, trading and forums
+
+Run these **in order** in the SQL Editor, **before** deploying the matching
+frontend (the new Account page reads a column v1.8 adds):
+
+1. `migrations/014_social_friends.sql`: friend requests, blocking, reports
+2. `migrations/015_social_chat.sql`: 1-to-1 and group chat (live via Realtime)
+3. `migrations/016_social_collaboration.sql`: Pokémon cards in chat, compare collections, trade lists
+4. `migrations/017_forums.sql`: forum categories, posts, threaded comments, votes
+
+After each one, run its `verify-v1.x.sql`. Every row should say `ok = true`.
+All four are safe to rerun.
+
+Notes:
+
+- Chat updates live through Supabase Realtime. The migrations add the tables to
+  the `supabase_realtime` publication themselves; nothing to toggle in the dashboard.
+- Admins cannot read private chats. Reports carry a snapshot of the reported
+  message, post or comment instead, and show up on the Admin page.
+- Friends can see each other's collections by default (Account → "Friends can
+  see my collection"). The public collection summary is a separate switch.
+- Starter forum categories are created by v1.9. Edit names and descriptions in
+  the `forum_categories` table; Announcements only accepts admin posts.

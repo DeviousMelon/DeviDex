@@ -20,3 +20,6 @@ Thumbs.db
 
 # Windows folder settings
 Desktop.ini
+
+# Cloudflare Wrangler local state
+.wrangler/

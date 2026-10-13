@@ -1,0 +1,14 @@
+// Cloudflare Workers deploy settings for DeviDex.
+// "single-page-application" serves index.html for routes like /friends or
+// /chat/abc, so React Router can handle them. This replaces public/_redirects,
+// which Workers rejects as an infinite loop alongside this setting.
+// Cloudflare Pages does the same automatically when there is no 404.html.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "devidex-cloudflare",
+  "compatibility_date": "2026-10-06",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
