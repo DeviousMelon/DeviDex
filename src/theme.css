@@ -1003,6 +1003,20 @@ a.box-mosaic__box:hover { border-color: var(--blue); }
 .account .delete-confirm-field span { font-weight: 600; }
 .account .danger-zone { border-color: #EBC2AC; background: var(--surface); }
 .account .danger-zone .text-button { font-size: inherit; }
+.account .clear-progress { margin-top: 20px; display: grid; gap: 14px; justify-items: start; }
+.account .clear-progress > * { margin: 0; }
+.clear-progress__field { width: min(420px, 100%); display: grid; gap: 6px; font-weight: 600; }
+.clear-progress__field select {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 400;
+}
+.account .clear-progress .delete-confirm-field { width: min(420px, 100%); }
 
 /* ---- Sign in ------------------------------------------------- */
 
@@ -1113,8 +1127,3 @@ a.box-mosaic__box:hover { border-color: var(--blue); }
 .public-collection-summary div { border-radius: 12px; }
 .public-collection-summary span { text-transform: none; letter-spacing: 0; }
 .public-collection-summary strong { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
-
-/* Pokémon detail: the name is the hero, but not a billboard. */
-.pokemon-detail-page { padding-top: 24px; }
-.pokemon-detail-intro h1 { font-size: clamp(2.2rem, 4.2vw, 3.4rem); letter-spacing: -0.035em; }
-.pokemon-info-card { border-color: var(--line); box-shadow: none; }

@@ -21,10 +21,12 @@ type DexToolbarProps = {
   resultText?: string;
   resultIsError?: boolean;
   placeholder?: string;
+  /** Autocomplete options (move or type names). */
+  suggestions?: string[];
 };
 
 /** Search + filters, pinned under the top bar while scrolling a Dex. */
-export function DexToolbar({ search, onSearch, searchMode, onSearchMode, filter, onFilter, resultText, resultIsError, placeholder }: DexToolbarProps) {
+export function DexToolbar({ search, onSearch, searchMode, onSearchMode, filter, onFilter, resultText, resultIsError, placeholder, suggestions = [] }: DexToolbarProps) {
   const searchPlaceholder = placeholder
     ?? (searchMode === 'type' ? 'Type, e.g. Dragon' : searchMode === 'move' ? 'Move, e.g. Surf' : 'Search name or number');
 
@@ -38,7 +40,14 @@ export function DexToolbar({ search, onSearch, searchMode, onSearchMode, filter,
           onChange={(event) => onSearch(event.target.value)}
           placeholder={searchPlaceholder}
           aria-label="Search this Dex"
+          list={suggestions.length ? 'dex-search-suggestions' : undefined}
+          autoComplete="off"
         />
+        {suggestions.length > 0 && (
+          <datalist id="dex-search-suggestions">
+            {suggestions.map((option) => <option key={option} value={option} />)}
+          </datalist>
+        )}
         {searchMode && onSearchMode && (
           <select value={searchMode} onChange={(event) => onSearchMode(event.target.value as PokemonSearchMode)} aria-label="Search by">
             <option value="pokemon">Name</option>

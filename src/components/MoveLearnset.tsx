@@ -23,9 +23,9 @@ type LearnsetRow = {
 
 const groupLabels: Record<MoveGroup, string> = {
   'level-up': 'Level up',
-  machine: 'TM / HM / TR',
+  machine: 'TMs',
   tutor: 'Tutor',
-  egg: 'Egg Moves',
+  egg: 'Egg',
   other: 'Other',
 };
 
@@ -100,44 +100,38 @@ function MoveRow({ row }: { row: LearnsetRow }) {
   }, [detail, open, row.methodSlug, row.moveSlug, row.sourceVersionGroup]);
 
   const effect = detail ? latestEnglishMoveEffect(detail) : '';
-  const learnLabel = row.methodSlug === 'machine' && machineLabel
-    ? machineLabel
-    : moveLevelLabel(row.methodSlug, row.level);
   const isLevel = row.methodSlug === 'level-up';
+  const when = isLevel ? moveLevelLabel(row.methodSlug, row.level) : machineLabel;
 
   return (
-    <article className={`move-row${open ? ' is-open' : ''}`}>
+    <li className={`move-row${open ? ' is-open' : ''}${isLevel ? ' has-when' : ''}`}>
       <button className="move-row__summary" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+        {isLevel && <span className="move-row__when">{when}</span>}
         <span className="move-row__name">{humanizeApiName(row.moveSlug)}</span>
-        <span className={`move-row__method${isLevel ? ' move-row__method--level' : ''}`}>{learnLabel}</span>
-        <span className="move-row__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
+        {!isLevel && machineLabel && <span className="move-row__machine">{machineLabel}</span>}
+        <svg className="move-row__chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
       </button>
 
       {open && (
         <div className="move-row__details">
-          {loading && <p>Loading move details…</p>}
-          {error && <p className="pokemon-detail-source-state pokemon-detail-source-state--warning">{error}</p>}
+          {loading && <p className="muted">Loading…</p>}
+          {error && <p className="pokemon-page__warning">Couldn't load this move.</p>}
           {detail && (
             <>
-              <div className="move-detail-facts">
+              <div className="move-facts">
                 <span className={`pokemon-type pokemon-type--${detail.type.name}`}>{humanizeApiName(detail.type.name)}</span>
-                <span><strong>{humanizeApiName(detail.damage_class.name)}</strong> category</span>
-                <span><strong>{detail.power ?? '—'}</strong> power</span>
-                <span><strong>{detail.accuracy != null ? `${detail.accuracy}%` : '—'}</strong> accuracy</span>
-                <span><strong>{detail.pp ?? '—'}</strong> PP</span>
-                {detail.priority !== 0 && <span><strong>{detail.priority > 0 ? `+${detail.priority}` : detail.priority}</strong> priority</span>}
+                <span>{humanizeApiName(detail.damage_class.name)}</span>
+                <span>Power <strong>{detail.power ?? '—'}</strong></span>
+                <span>Accuracy <strong>{detail.accuracy != null ? `${detail.accuracy}%` : '—'}</strong></span>
+                <span>PP <strong>{detail.pp ?? '—'}</strong></span>
+                {detail.priority !== 0 && <span>Priority <strong>{detail.priority > 0 ? `+${detail.priority}` : detail.priority}</strong></span>}
               </div>
-              {row.methodSlug === 'machine' && (
-                <p className="move-row__machine-note">
-                  <strong>Machine:</strong> {machineLabel ?? 'PokéAPI does not list a machine number for this game group.'}
-                </p>
-              )}
               {effect && <p className="move-row__effect">{effect}</p>}
             </>
           )}
         </div>
       )}
-    </article>
+    </li>
   );
 }
 
@@ -217,65 +211,50 @@ export function MoveLearnset({
   }, [group, rows, search]);
 
   return (
-    <section className="pokemon-info-card pokemon-moves-card" id="moves">
-      <div className="pokemon-info-card__heading pokemon-info-card__heading--inline pokemon-moves-card__heading">
-        <div>
-          <p className="eyebrow">Moves · {versionGroupLabel(versionGroup)}</p>
-          <h2>Learnset</h2>
-          <p>The game context above controls this entire learnset. Each learning method gets its own tab by default.</p>
+    <section className="panel pokemon-section pokemon-moves" id="moves" aria-labelledby="moves-title">
+      <div className="pokemon-section__head">
+        <h2 id="moves-title">Moves</h2>
+        <span className="pokemon-section__context">{versionGroupLabel(versionGroup)}</span>
+      </div>
+
+      <div className="pokemon-moves__controls">
+        <div className="segmented" role="tablist" aria-label="How it learns">
+          {groupOrder.filter((key) => counts[key] > 0 || key === 'level-up').map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={group === key}
+              className={group === key ? 'is-active' : undefined}
+              onClick={() => setGroup(key)}
+            >
+              {groupLabels[key]} <span className="pokemon-moves__count">{counts[key]}</span>
+            </button>
+          ))}
         </div>
-      </div>
-
-      <div className="move-tabs" role="tablist" aria-label="Move learn method">
-        {groupOrder.map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={group === key}
-            className={group === key ? 'is-active' : ''}
-            disabled={counts[key] === 0}
-            onClick={() => setGroup(key)}
-          >
-            {groupLabels[key]} <span>{counts[key]}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="move-toolbar move-toolbar--tabbed">
-        <label className="collection-search move-search">
-          <span>Search {groupLabels[group]}</span>
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="e.g. Ice Beam" />
-        </label>
-      </div>
-
-      <div className="move-result-line">
-        <strong>{filteredRows.length.toLocaleString()}</strong> {groupLabels[group].toLowerCase()} in {versionGroupLabel(versionGroup)}
+        <input
+          className="pokemon-moves__search"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Filter moves"
+          aria-label="Filter moves"
+        />
       </div>
 
       {filteredRows.length ? (
-        <section className="move-group move-group--active" role="tabpanel">
-          <div className="move-list">
-            {filteredRows.map((row) => (
-              <MoveRow key={`${row.sourceVersionGroup}-${row.moveSlug}-${row.methodSlug}-${row.level}`} row={row} />
-            ))}
-          </div>
-        </section>
+        <ul className="move-list" role="tabpanel">
+          {filteredRows.map((row) => (
+            <MoveRow key={`${row.sourceVersionGroup}-${row.moveSlug}-${row.methodSlug}-${row.level}`} row={row} />
+          ))}
+        </ul>
       ) : (
-        <div className="dex-empty-state move-empty-state"><strong>No moves are listed in this tab for the selected game.</strong></div>
+        <p className="muted">{search.trim() ? `No ${groupLabels[group].toLowerCase()} moves match “${search.trim()}”.` : 'No moves listed for this game.'}</p>
       )}
 
-      {counts.egg === 0 && (
-        <p className="pokemon-detail-source-state pokemon-detail-source-state--quiet move-egg-note">
-          {breedingSupported
-            ? 'PokéAPI currently lists no Egg Move records for this Pokémon in the selected game context. DeviDex will not silently borrow Egg Moves from a different generation.'
-            : 'Breeding is not available in this game, so an Egg Move tab is not applicable here.'}
-        </p>
+      {group === 'level-up' && counts.egg === 0 && !breedingSupported && (
+        <p className="pokemon-section__foot">No breeding in this game, so no Egg Moves.</p>
       )}
-
-      <p className="pokemon-detail-source-note pokemon-moves-card__note">
-        Learnsets are filtered by the selected game/version group. Expansion contexts inherit their base game data, then apply expansion-specific additions.
-      </p>
     </section>
   );
 }
