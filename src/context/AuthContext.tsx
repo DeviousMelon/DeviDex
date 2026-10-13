@@ -44,22 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // select('*') rather than a column list: RLS already limits this to the
+    // user's own row, and it keeps sign-in working if the site is deployed
+    // before a migration adds a new column (e.g. v1.8's collection_friends_visible).
     const { data, error } = await supabase
       .from('profiles')
-      .select(`
-        id,
-        username,
-        display_name,
-        avatar_path,
-        home_friend_code,
-        home_friend_code_public,
-        profile_public,
-        collection_public,
-        collection_friends_visible,
-        role,
-        created_at,
-        updated_at
-      `)
+      .select('*')
       .eq('id', userId)
       .single();
 

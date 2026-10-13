@@ -190,7 +190,8 @@ export function AccountPage() {
         home_friend_code_public: profilePublic && cleanFriendCode ? homeFriendCodePublic : false,
         profile_public: profilePublic,
         collection_public: profilePublic ? collectionPublic : false,
-        collection_friends_visible: collectionFriendsVisible,
+        // Only sent once the v1.8 migration has added the column.
+        ...(profile && 'collection_friends_visible' in profile ? { collection_friends_visible: collectionFriendsVisible } : {}),
       })
       .eq('id', user.id);
 
