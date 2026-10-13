@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useOrderedSaves } from '../lib/orderedSaves';
 import { useAuth } from '../context/AuthContext';
 import { useGuestProgress } from '../context/GuestProgressContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
@@ -48,6 +49,7 @@ export function useDexCatalog() {
   const { categoryEnabled } = useFormPreferences();
   const [allCatalog, setAllCatalog] = useState<DexCatalogEntry[]>([]);
   const [progress, setProgress] = useState<Record<number, CollectionProgress>>({});
+  const runOrderedSave = useOrderedSaves<CollectionProgress>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -192,22 +194,27 @@ export function useDexCatalog() {
 
     setProgress((current) => ({ ...current, [formId]: next }));
 
-    const { error: saveError } = await supabase.from('collection_progress').upsert(
-      {
-        user_id: user.id,
-        form_id: formId,
-        normal_owned: normalOwned,
-        shiny_owned: shinyOwned,
+    const client = supabase;
+    const userId = user.id;
+
+    return runOrderedSave(
+      String(formId),
+      before,
+      next,
+      async () => {
+        const { error: saveError } = await client.from('collection_progress').upsert(
+          {
+            user_id: userId,
+            form_id: formId,
+            normal_owned: normalOwned,
+            shiny_owned: shinyOwned,
+          },
+          { onConflict: 'user_id,form_id' },
+        );
+        return { error: saveError ? saveError.message : null };
       },
-      { onConflict: 'user_id,form_id' },
+      (confirmedState) => setProgress((current) => ({ ...current, [formId]: confirmedState })),
     );
-
-    if (saveError) {
-      setProgress((current) => ({ ...current, [formId]: before }));
-      return { error: saveError.message };
-    }
-
-    return { error: null };
   }
 
   // Base species always count. Optional categories are filtered locally so
