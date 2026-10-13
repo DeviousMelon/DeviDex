@@ -617,3 +617,6 @@ grant execute on function public.resolve_report(uuid, text, text) to authenticat
 -- Profile pages are public, so anon can ask; it simply always gets 'none'.
 revoke all on function public.get_relationship(text) from public;
 grant execute on function public.get_relationship(text) to anon, authenticated;
+
+-- Tell Supabase's API to pick up the new functions straight away.
+notify pgrst, 'reload schema';
