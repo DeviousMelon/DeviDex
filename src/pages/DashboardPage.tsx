@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
 import { useDexCatalog } from '../hooks/useDexCatalog';
 import { useStartedGameDexes } from '../hooks/useStartedGameDexes';
-import { progressCards as demoProgressCards } from '../data/samplePokemon';
 import type { DexStatus, ProgressCardData } from '../types';
 
 const formatDexNumber = (number: number) => `#${number.toString().padStart(4, '0')}`;
@@ -69,11 +68,19 @@ export function DashboardPage() {
           total: Math.max(stats.availableAlternateForms, 1),
           detail: stats.availableAlternateForms
             ? `${stats.availableAlternateForms - stats.alternateForms} optional form slots currently excluded`
-            : 'Run the Phase 4 form importer from Admin to add optional forms',
+            : 'No optional forms are available yet',
           tone: 'orange',
         },
       ]
-    : demoProgressCards;
+    // Never show made-up numbers: until the catalogue arrives, show empty
+    // cards that say so (the old demo figures could pass for real progress).
+    : ['National Living Dex', 'Shiny Living Dex', 'Extra Forms Included'].map((label, index) => ({
+        label,
+        current: 0,
+        total: 0,
+        detail: loading ? 'Loading your collection…' : 'Could not load the Pokédex right now',
+        tone: (['blue', 'gold', 'orange'] as const)[index],
+      }));
 
   const recentPokemon = databaseReady
     ? catalog.slice(0, 12).map((entry) => {
