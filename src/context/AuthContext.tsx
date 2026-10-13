@@ -19,8 +19,12 @@ interface AuthContextValue {
   loading: boolean;
   configured: boolean;
   signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (email: string, password: string, username: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<AuthResult>;
+  updatePassword: (password: string) => Promise<AuthResult>;
+  updateEmail: (email: string) => Promise<AuthResult>;
+  deleteAccount: () => Promise<AuthResult>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -32,8 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // profiles.role is used by the UI to decide whether /admin should render.
-  // IMPORTANT: this is convenience, not the security boundary. The database
-  // policies in supabase/schema.sql are what actually enforce admin access.
+  // IMPORTANT: this is convenience, not the security boundary. PostgreSQL RLS
+  // and column permissions are the actual security boundary.
   async function loadProfile(userId: string) {
     if (!supabase) {
       setProfile(null);
@@ -42,7 +46,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, display_name, role, created_at')
+      .select(`
+        id,
+        username,
+        display_name,
+        avatar_path,
+        home_friend_code,
+        home_friend_code_public,
+        profile_public,
+        collection_public,
+        role,
+        created_at,
+        updated_at
+      `)
       .eq('id', userId)
       .single();
 
@@ -60,8 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Before Supabase credentials exist, finish loading instead of crashing the
-    // entire site. This means you can keep working on public pages first.
     if (!supabase) {
       setLoading(false);
       return;
@@ -84,15 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initialiseAuth();
 
-    // Supabase fires this when login/logout/token refresh changes the session.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
 
       if (nextSession?.user.id) {
-        // Keep protected routes in their loading state until the user's role is
-        // known. Otherwise /admin could redirect before the profile query ends.
         setLoading(true);
         window.setTimeout(async () => {
           await loadProfile(nextSession.user.id);
@@ -116,27 +127,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
-  async function signUp(
-    email: string,
-    password: string,
-    username: string,
-  ): Promise<AuthResult> {
+  async function signUp(email: string, password: string): Promise<AuthResult> {
     if (!supabase) return { error: 'Supabase has not been configured yet.' };
 
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        // If email confirmation is enabled, Supabase can send the user back to
-        // the same DeviDex origin they signed up from. Add that origin to
-        // Supabase Auth -> URL Configuration -> Redirect URLs first.
+        // After verification, the user lands on Account where a very short
+        // first-time profile form asks for username/avatar/HOME code.
         emailRedirectTo: `${window.location.origin}/account`,
-
-        // The database trigger copies this into public.profiles on account creation.
-        data: { username: username.trim() || null },
       },
     });
 
+    return { error: error?.message ?? null };
+  }
+
+  async function resetPassword(email: string): Promise<AuthResult> {
+    if (!supabase) return { error: 'Supabase has not been configured yet.' };
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return { error: error?.message ?? null };
+  }
+
+  async function updatePassword(password: string): Promise<AuthResult> {
+    if (!supabase) return { error: 'Supabase has not been configured yet.' };
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  }
+
+  async function updateEmail(email: string): Promise<AuthResult> {
+    if (!supabase) return { error: 'Supabase has not been configured yet.' };
+    const { error } = await supabase.auth.updateUser({ email: email.trim() });
+    return { error: error?.message ?? null };
+  }
+
+  /**
+   * Account deletion is performed by a tiny SECURITY DEFINER database function.
+   * The browser never receives service-role credentials; the function can only
+   * delete auth.uid(), so a user cannot point it at somebody else's account.
+   */
+  async function deleteAccount(): Promise<AuthResult> {
+    if (!supabase) return { error: 'Supabase has not been configured yet.' };
+    const { error } = await supabase.rpc('delete_own_account');
     return { error: error?.message ?? null };
   }
 
@@ -156,6 +191,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       signOut,
+      resetPassword,
+      updatePassword,
+      updateEmail,
+      deleteAccount,
       refreshProfile,
     }),
     [session, profile, loading],
