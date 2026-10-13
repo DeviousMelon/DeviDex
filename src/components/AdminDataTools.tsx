@@ -73,7 +73,34 @@ type FormCsvRow = {
 const POKEMON_CSV = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon.csv';
 const POKEMON_FORMS_CSV = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_forms.csv';
 const POKEMON_SPECIES_CSV = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_species.csv';
-const POKEMON_GAME_INDICES_CSV = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_game_indices.csv';
+// Which games a form is really in: PokéAPI only has learnsets for Pokémon that
+// exist in a game's data, so "has moves in version group X" is the evidence.
+// (pokemon_game_indices has no rows at all for form Pokémon, ids 10000+.)
+const POKEMON_MOVES_CSV = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_moves.csv';
+const GMAX_VERSION_GROUPS = ['sword-shield', 'the-isle-of-armor', 'the-crown-tundra'];
+
+/** pokemon_id → version group ids with a learnset. Line-scans a ~10 MB CSV without building row objects. */
+function learnsetVersionGroups(text: string, wanted: Set<number>) {
+  const result = new Map<number, Set<number>>();
+  let start = text.indexOf('\n') + 1;
+  while (start > 0 && start < text.length) {
+    let end = text.indexOf('\n', start);
+    if (end < 0) end = text.length;
+    const firstComma = text.indexOf(',', start);
+    if (firstComma > start && firstComma < end) {
+      const pokemonId = Number(text.slice(start, firstComma));
+      if (wanted.has(pokemonId)) {
+        const secondComma = text.indexOf(',', firstComma + 1);
+        const versionGroupId = Number(text.slice(firstComma + 1, secondComma));
+        const set = result.get(pokemonId) ?? new Set<number>();
+        set.add(versionGroupId);
+        result.set(pokemonId, set);
+      }
+    }
+    start = end + 1;
+  }
+  return result;
+}
 const VERSIONS_CSV = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/versions.csv';
 const VERSION_GROUPS_CSV = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/version_groups.csv';
 
@@ -579,11 +606,11 @@ export function AdminDataTools() {
 
     setImportingGameForms(true);
     setMessage(null);
-    setImportProgress('Reading PokéAPI game/form compatibility tables…');
+    setImportProgress('Reading PokéAPI learnsets to see which forms are in which games (about 10 MB)…');
 
     try {
-      const [indicesText, versionsText, versionGroupsText, gamesResult] = await Promise.all([
-        fetchText(POKEMON_GAME_INDICES_CSV),
+      const [movesText, versionsText, versionGroupsText, gamesResult] = await Promise.all([
+        fetchText(POKEMON_MOVES_CSV),
         fetchText(VERSIONS_CSV),
         fetchText(VERSION_GROUPS_CSV),
         supabase.from('games').select('id, slug, generation').eq('is_active', true),
@@ -592,6 +619,7 @@ export function AdminDataTools() {
 
       const forms: Array<{
         id: number;
+        slug: string;
         source_pokemon_id: number | null;
         introduced_version_group: string | null;
         form_category: FormCategory;
@@ -599,7 +627,7 @@ export function AdminDataTools() {
       for (let from = 0; ; from += 500) {
         const { data, error } = await supabase
           .from('pokemon_forms')
-          .select('id, source_pokemon_id, introduced_version_group, form_category')
+          .select('id, slug, source_pokemon_id, introduced_version_group, form_category')
           .eq('is_trackable', true)
           .eq('is_default', false)
           .range(from, from + 499);
@@ -617,53 +645,63 @@ export function AdminDataTools() {
       const games = (gamesResult.data ?? []) as Array<{ id: number; slug: string; generation: number }>;
       const gameBySlug = new Map(games.map((game) => [game.slug, game]));
 
-      const versionIdentifierById = new Map(
-        parseSimpleCsv(versionsText).map((row) => [Number(row.id), row.identifier]),
-      );
-      const generationByVersionGroup = new Map(
-        parseSimpleCsv(versionGroupsText).map((row) => [row.identifier, Number(row.generation_id)]),
-      );
+      const versionGroupRows = parseSimpleCsv(versionGroupsText);
+      const versionGroupIdByIdentifier = new Map(versionGroupRows.map((row) => [row.identifier, Number(row.id)]));
+      const generationByVersionGroupId = new Map(versionGroupRows.map((row) => [Number(row.id), Number(row.generation_id)]));
 
-      const localGameIdByVersionId = new Map<number, number>();
-      for (const [versionId, identifier] of versionIdentifierById) {
-        const localSlug = localGameSlugForVersionIdentifier(identifier);
-        const game = gameBySlug.get(localSlug);
-        if (game) localGameIdByVersionId.set(versionId, game.id);
+      // version group → the local games (Sword, Shield…) that belong to it.
+      const gameIdsByVersionGroupId = new Map<number, Set<number>>();
+      for (const row of parseSimpleCsv(versionsText)) {
+        const game = gameBySlug.get(localGameSlugForVersionIdentifier(row.identifier));
+        if (!game) continue;
+        const versionGroupId = Number(row.version_group_id);
+        const set = gameIdsByVersionGroupId.get(versionGroupId) ?? new Set<number>();
+        set.add(game.id);
+        gameIdsByVersionGroupId.set(versionGroupId, set);
       }
 
+      setImportProgress('Matching forms to games…');
       const wantedPokemonIds = new Set(forms.flatMap((form) => form.source_pokemon_id == null ? [] : [form.source_pokemon_id]));
-      const gameIdsByPokemonId = new Map<number, Set<number>>();
-      for (const row of parseSimpleCsv(indicesText)) {
-        const pokemonId = Number(row.pokemon_id);
-        if (!wantedPokemonIds.has(pokemonId)) continue;
-        const gameId = localGameIdByVersionId.get(Number(row.version_id));
-        if (!gameId) continue;
-        const list = gameIdsByPokemonId.get(pokemonId) ?? new Set<number>();
-        list.add(gameId);
-        gameIdsByPokemonId.set(pokemonId, list);
-      }
+      const learnsets = learnsetVersionGroups(movesText, wantedPokemonIds);
 
-      const gameById = new Map(games.map((game) => [game.id, game]));
       const unique = new Set<string>();
       const rows: Array<{ game_id: number; form_id: number; source: string; notes: string }> = [];
+      let fallbackForms = 0;
 
       for (const form of forms) {
         if (form.source_pokemon_id == null) continue;
-        const introducedGeneration = generationByVersionGroup.get(form.introduced_version_group ?? '') ?? 1;
-        for (const gameId of gameIdsByPokemonId.get(form.source_pokemon_id) ?? []) {
-          const game = gameById.get(gameId);
-          if (!game || game.generation < introducedGeneration) continue;
-          const key = `${gameId}:${form.id}`;
-          if (unique.has(key)) continue;
-          unique.add(key);
-          rows.push({
-            game_id: gameId,
-            form_id: form.id,
-            source: 'pokeapi-game-index',
-            notes: `PokéAPI game-index evidence; form introduced in ${form.introduced_version_group}.`,
-          });
+        const introducedId = versionGroupIdByIdentifier.get(form.introduced_version_group ?? '');
+        const introducedGeneration = generationByVersionGroupId.get(introducedId ?? -1) ?? 1;
+
+        let versionGroupIds = [...(learnsets.get(form.source_pokemon_id) ?? [])];
+        let source = 'pokeapi-learnset';
+        if (!versionGroupIds.length) {
+          // No learnset (G-Max, brand-new Megas): fall back to where it debuted.
+          fallbackForms += 1;
+          source = 'pokeapi-introduced';
+          versionGroupIds = /-gmax$/.test(form.slug)
+            ? GMAX_VERSION_GROUPS.flatMap((name) => versionGroupIdByIdentifier.get(name) ?? [])
+            : introducedId != null ? [introducedId] : [];
+        }
+
+        for (const versionGroupId of versionGroupIds) {
+          // Female forms and cosmetic forms share the base Pokémon's learnset,
+          // so they also need "not before the form existed".
+          if ((generationByVersionGroupId.get(versionGroupId) ?? 99) < introducedGeneration) continue;
+          for (const gameId of gameIdsByVersionGroupId.get(versionGroupId) ?? []) {
+            const key = `${gameId}:${form.id}`;
+            if (unique.has(key)) continue;
+            unique.add(key);
+            rows.push({
+              game_id: gameId,
+              form_id: form.id,
+              source,
+              notes: `Form introduced in ${form.introduced_version_group}.`,
+            });
+          }
         }
       }
+      if (fallbackForms) console.info(`${fallbackForms} forms had no learnset; used their debut game instead.`);
 
       setImportProgress('Replacing Game Form Availability reference rows…');
       const { error: deleteError } = await supabase.from('game_form_availability').delete().gt('form_id', 0);
@@ -675,7 +713,7 @@ export function AdminDataTools() {
         if (error) throw error;
       }
 
-      setMessage(`Synced ${rows.length.toLocaleString()} game/form compatibility pairs across ${games.length} games. Game Dex form filters can now use actual version evidence.`);
+      setMessage(`Synced ${rows.length.toLocaleString()} game/form compatibility pairs across ${games.length} games. Regional, female and other forms now show up in the Game Dexes they belong to.`);
       setImportProgress('');
       await loadCounts();
     } catch (error) {

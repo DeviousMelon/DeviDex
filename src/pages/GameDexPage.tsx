@@ -122,7 +122,7 @@ export function GameDexPage() {
 
       <CollectionSetupPanel
         categoryCounts={availableFormCategoryCounts}
-        formsNote={`Only forms that appear in ${selectedGame.shortLabel} are counted. These rules are shared with your National Dex.`}
+        formsNote={`Only forms that exist in ${selectedGame.shortLabel} count here. It's the same setup as your National Dex.`}
       />
 
       <DexToolbar
