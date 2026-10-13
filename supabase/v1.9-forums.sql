@@ -795,3 +795,6 @@ begin
   end loop;
 end;
 $$;
+
+-- Tell Supabase's API to pick up the new functions straight away.
+notify pgrst, 'reload schema';

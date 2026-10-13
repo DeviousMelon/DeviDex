@@ -256,3 +256,6 @@ grant execute on function public.compare_collection_with_friend(text) to authent
 -- Export/restore v4 (v1.2) predates trade lists. Rather than bump the backup
 -- format, the trade list is small and easy to rebuild, so it is left out of
 -- backups for now. Deleting an account removes it with everything else.
+
+-- Tell Supabase's API to pick up the new functions straight away.
+notify pgrst, 'reload schema';
