@@ -405,7 +405,7 @@ export function AccountPage() {
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
-                placeholder="Devious"
+                placeholder="e.g. ShinyHunter"
                 required
                 maxLength={20}
               />
