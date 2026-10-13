@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
 import { useGuestProgress } from '../context/GuestProgressContext';
 import { supabase } from '../lib/supabase';
+import { useOrderedSaves } from '../lib/orderedSaves';
 import type {
   FormCategory,
   GameDexCatalogEntry,
@@ -91,6 +92,7 @@ export function useGameDex(setSlug: string | undefined, preferredGameSlug?: stri
   const [selectedGame, setSelectedGame] = useState<GameVersionOption | null>(null);
   const [allCatalog, setAllCatalog] = useState<GameDexCatalogEntry[]>([]);
   const [progress, setProgress] = useState<Record<string, GameDexEntryProgress>>({});
+  const runOrderedSave = useOrderedSaves<GameDexEntryProgress>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -359,42 +361,50 @@ export function useGameDex(setSlug: string | undefined, preferredGameSlug?: stri
       return { error: null };
     }
 
-    // Keep the two progress-table writes in explicit branches. Supabase's
-    // generated overloads can then validate each payload instead of trying to
-    // reconcile a union containing either species_id or form_id.
-    const { error: saveError } = entry.formId == null
-      ? await supabase.from('game_collection_progress').upsert({
-          user_id: user.id,
-          game_id: selectedGame.id,
-          species_id: entry.speciesId,
-          normal_owned: normalOwned,
-          shiny_owned: shinyOwned,
-        }, { onConflict: 'user_id,game_id,species_id' })
-      : await supabase.from('game_form_collection_progress').upsert({
-          user_id: user.id,
-          game_id: selectedGame.id,
-          form_id: entry.formId,
-          normal_owned: normalOwned,
-          shiny_owned: shinyOwned,
-        }, { onConflict: 'user_id,game_id,form_id' });
-    if (!saveError) {
-      const { error: activityError } = await supabase.from('game_dex_activity').upsert({
-        user_id: user.id,
-        set_id: game.id,
-        game_id: selectedGame.id,
-        last_activity_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,set_id' });
-      if (activityError) {
-        setProgress((current) => ({ ...current, [entry.progressKey]: before }));
-        return { error: activityError.message };
-      }
-    }
+    const client = supabase;
+    const userId = user.id;
+    const gameId = selectedGame.id;
+    const setId = game.id;
 
-    if (saveError) {
-      setProgress((current) => ({ ...current, [entry.progressKey]: before }));
-      return { error: saveError.message };
-    }
-    return { error: null };
+    return runOrderedSave(
+      `${gameId}:${entry.progressKey}`,
+      before,
+      next,
+      async () => {
+        // Keep the two progress-table writes in explicit branches. Supabase's
+        // generated overloads can then validate each payload instead of trying to
+        // reconcile a union containing either species_id or form_id.
+        const { error: saveError } = entry.formId == null
+          ? await client.from('game_collection_progress').upsert({
+              user_id: userId,
+              game_id: gameId,
+              species_id: entry.speciesId,
+              normal_owned: normalOwned,
+              shiny_owned: shinyOwned,
+            }, { onConflict: 'user_id,game_id,species_id' })
+          : await client.from('game_form_collection_progress').upsert({
+              user_id: userId,
+              game_id: gameId,
+              form_id: entry.formId,
+              normal_owned: normalOwned,
+              shiny_owned: shinyOwned,
+            }, { onConflict: 'user_id,game_id,form_id' });
+        if (saveError) return { error: saveError.message };
+
+        // The "last played" timestamp is a nice-to-have. The progress above is
+        // already saved, so a failure here must not untick the tile.
+        const { error: activityError } = await client.from('game_dex_activity').upsert({
+          user_id: userId,
+          set_id: setId,
+          game_id: gameId,
+          last_activity_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,set_id' });
+        if (activityError) console.warn('Could not update Game Dex activity:', activityError.message);
+
+        return { error: null };
+      },
+      (confirmedState) => setProgress((current) => ({ ...current, [entry.progressKey]: confirmedState })),
+    );
   }
 
   const stats = useMemo(() => ({
