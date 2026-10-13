@@ -37,6 +37,7 @@ export function AccountPage() {
   const [homeFriendCodePublic, setHomeFriendCodePublic] = useState(false);
   const [profilePublic, setProfilePublic] = useState(true);
   const [collectionPublic, setCollectionPublic] = useState(false);
+  const [collectionFriendsVisible, setCollectionFriendsVisible] = useState(true);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [availability, setAvailability] = useState<Availability>('idle');
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
@@ -78,6 +79,7 @@ export function AccountPage() {
     setHomeFriendCodePublic(profile.home_friend_code_public ?? false);
     setProfilePublic(profile.profile_public ?? true);
     setCollectionPublic(profile.collection_public ?? false);
+    setCollectionFriendsVisible(profile.collection_friends_visible ?? true);
   }, [profile]);
 
   useEffect(() => {
@@ -188,6 +190,7 @@ export function AccountPage() {
         home_friend_code_public: profilePublic && cleanFriendCode ? homeFriendCodePublic : false,
         profile_public: profilePublic,
         collection_public: profilePublic ? collectionPublic : false,
+        collection_friends_visible: collectionFriendsVisible,
       })
       .eq('id', user.id);
 
@@ -460,6 +463,15 @@ export function AccountPage() {
                 onChange={(event) => setCollectionPublic(event.target.checked)}
               />
               <span><strong>Show collection summary</strong><small>Shows completion totals, never your private notes.</small></span>
+            </label>
+
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={collectionFriendsVisible}
+                onChange={(event) => setCollectionFriendsVisible(event.target.checked)}
+              />
+              <span><strong>Friends can see my collection</strong><small>Lets friends compare collections and find trades with you.</small></span>
             </label>
           </div>
 

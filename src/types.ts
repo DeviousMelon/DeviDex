@@ -30,6 +30,8 @@ export interface UserProfile {
   home_friend_code_public: boolean;
   profile_public: boolean;
   collection_public: boolean;
+  /** v1.8: friends may compare collections with you. */
+  collection_friends_visible?: boolean;
   role: UserRole;
   created_at: string;
   updated_at: string | null;

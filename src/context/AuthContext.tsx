@@ -55,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         home_friend_code_public,
         profile_public,
         collection_public,
+        collection_friends_visible,
         role,
         created_at,
         updated_at
