@@ -374,21 +374,37 @@ export function useGameDex(setSlug: string | undefined, preferredGameSlug?: stri
         // Keep the two progress-table writes in explicit branches. Supabase's
         // generated overloads can then validate each payload instead of trying to
         // reconcile a union containing either species_id or form_id.
+        // Not owned at all = no row (rows with notes are kept so a note is never lost).
+        const nothingOwned = !normalOwned && !shinyOwned;
         const { error: saveError } = entry.formId == null
-          ? await client.from('game_collection_progress').upsert({
-              user_id: userId,
-              game_id: gameId,
-              species_id: entry.speciesId,
-              normal_owned: normalOwned,
-              shiny_owned: shinyOwned,
-            }, { onConflict: 'user_id,game_id,species_id' })
-          : await client.from('game_form_collection_progress').upsert({
-              user_id: userId,
-              game_id: gameId,
-              form_id: entry.formId,
-              normal_owned: normalOwned,
-              shiny_owned: shinyOwned,
-            }, { onConflict: 'user_id,game_id,form_id' });
+          ? nothingOwned
+            ? await client.from('game_collection_progress')
+                .delete()
+                .eq('user_id', userId)
+                .eq('game_id', gameId)
+                .eq('species_id', entry.speciesId)
+                .is('notes', null)
+            : await client.from('game_collection_progress').upsert({
+                user_id: userId,
+                game_id: gameId,
+                species_id: entry.speciesId,
+                normal_owned: normalOwned,
+                shiny_owned: shinyOwned,
+              }, { onConflict: 'user_id,game_id,species_id' })
+          : nothingOwned
+            ? await client.from('game_form_collection_progress')
+                .delete()
+                .eq('user_id', userId)
+                .eq('game_id', gameId)
+                .eq('form_id', entry.formId)
+                .is('notes', null)
+            : await client.from('game_form_collection_progress').upsert({
+                user_id: userId,
+                game_id: gameId,
+                form_id: entry.formId,
+                normal_owned: normalOwned,
+                shiny_owned: shinyOwned,
+              }, { onConflict: 'user_id,game_id,form_id' });
         if (saveError) return { error: saveError.message };
 
         // The "last played" timestamp is a nice-to-have. The progress above is

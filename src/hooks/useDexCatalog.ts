@@ -202,15 +202,23 @@ export function useDexCatalog() {
       before,
       next,
       async () => {
-        const { error: saveError } = await client.from('collection_progress').upsert(
-          {
-            user_id: userId,
-            form_id: formId,
-            normal_owned: normalOwned,
-            shiny_owned: shinyOwned,
-          },
-          { onConflict: 'user_id,form_id' },
-        );
+        // Not owned at all = no row. Keeps the table to what people actually own.
+        // Rows with notes are left alone so unticking never loses a note.
+        const { error: saveError } = !normalOwned && !shinyOwned
+          ? await client.from('collection_progress')
+              .delete()
+              .eq('user_id', userId)
+              .eq('form_id', formId)
+              .is('notes', null)
+          : await client.from('collection_progress').upsert(
+              {
+                user_id: userId,
+                form_id: formId,
+                normal_owned: normalOwned,
+                shiny_owned: shinyOwned,
+              },
+              { onConflict: 'user_id,form_id' },
+            );
         return { error: saveError ? saveError.message : null };
       },
       (confirmedState) => setProgress((current) => ({ ...current, [formId]: confirmedState })),
