@@ -3,6 +3,8 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocial } from '../context/SocialContext';
 import { profileAvatarUrl } from '../lib/profile';
+import { useNow } from '../hooks/useNow';
+import { bankIsOpen, timeLeft } from '../lib/bank';
 
 const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? 'is-active' : undefined);
 
@@ -15,6 +17,11 @@ export function SiteHeader() {
   const avatar = profileAvatarUrl(profile);
   const initials = (profile?.username || user?.email || 'DV').slice(0, 2).toUpperCase();
   const isAdmin = profile?.role === 'admin';
+  // The Bank link is temporary: it leaves the nav once Bank has closed.
+  // /bank itself stays up as a record.
+  const now = useNow(60_000);
+  const bankOpen = bankIsOpen(now);
+  const bankDays = timeLeft(now).days;
 
   // Close both menus whenever the page changes.
   useEffect(() => {
@@ -38,6 +45,11 @@ export function SiteHeader() {
       <NavLink to="/national-dex" className={navClass}>National Dex</NavLink>
       <NavLink to="/games" className={navClass}>Game Dexes</NavLink>
       <NavLink to="/forums" className={navClass}>Forums</NavLink>
+      {bankOpen && (
+        <NavLink to="/bank" className={navClass} aria-label={`Bank shutdown, ${bankDays} days left`}>
+          Bank <span className="nav-countdown" aria-hidden="true">{bankDays}d</span>
+        </NavLink>
+      )}
       {isAdmin && <NavLink to="/admin" className={navClass}>Admin</NavLink>}
     </>
   );

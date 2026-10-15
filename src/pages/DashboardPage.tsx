@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { BankPrepCard } from '../components/BankCountdown';
 import { BoxMosaic, BOX_SIZE, type CellState } from '../components/BoxMosaic';
 import { PokemonSprite } from '../components/PokemonSprite';
 import { useAuth } from '../context/AuthContext';
@@ -66,6 +67,8 @@ function SignedInDashboard() {
           <span>{goalOwned.toLocaleString()} of {goalTotal.toLocaleString()} {goal === 'shiny' ? 'shinies' : 'slots'}</span>
         </div>
       </section>
+
+      <BankPrepCard />
 
       <section className="home-boxes" aria-labelledby="boxes-title">
         <div className="home-boxes__head">
@@ -219,6 +222,8 @@ function Landing() {
         </div>
         <BoxMosaic cells={DEMO_CELLS} animate className="landing-hero__mosaic" />
       </section>
+
+      <BankPrepCard />
 
       <section className="landing-points" aria-label="What DeviDex does">
         <div>
