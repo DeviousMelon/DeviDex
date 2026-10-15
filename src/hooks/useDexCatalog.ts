@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useOrderedSaves } from '../lib/orderedSaves';
+import { clearProgressRow } from '../lib/progressRows';
 import { useAuth } from '../context/AuthContext';
 import { useGuestProgress } from '../context/GuestProgressContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
@@ -202,15 +203,20 @@ export function useDexCatalog() {
       before,
       next,
       async () => {
-        const { error: saveError } = await client.from('collection_progress').upsert(
-          {
-            user_id: userId,
-            form_id: formId,
-            normal_owned: normalOwned,
-            shiny_owned: shinyOwned,
-          },
-          { onConflict: 'user_id,form_id' },
-        );
+        // Not owned at all = no row. Keeps the table to what people actually own.
+        // A row with a note is kept (never lose a note) but still has to be
+        // marked unowned, or it would come back ticked on the next load.
+        const { error: saveError } = !normalOwned && !shinyOwned
+          ? await clearProgressRow(client, 'collection_progress', { user_id: userId, form_id: formId })
+          : await client.from('collection_progress').upsert(
+              {
+                user_id: userId,
+                form_id: formId,
+                normal_owned: normalOwned,
+                shiny_owned: shinyOwned,
+              },
+              { onConflict: 'user_id,form_id' },
+            );
         return { error: saveError ? saveError.message : null };
       },
       (confirmedState) => setProgress((current) => ({ ...current, [formId]: confirmedState })),
