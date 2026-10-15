@@ -1,5 +1,7 @@
 -- DeviDex v1.0 / Phase 5 verification
 -- Safe to run from the Supabase SQL Editor (where auth.uid() is normally null).
+-- Since v2.1.1, backup_v3_export_exists is expected to be FALSE: v2.1.1 drops
+-- export_own_collection_v3 on purpose (the app only exports v4).
 
 select
   to_regclass('public.user_collection_views') is not null as collection_views_table_exists,

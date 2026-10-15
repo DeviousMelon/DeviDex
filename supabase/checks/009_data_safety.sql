@@ -1,6 +1,8 @@
 -- DeviDex v0.8 Phase 3 verification
 
 -- Expected: 1 row for each function below.
+-- Since v2.1.1, export_own_collection_v2 is deliberately dropped, so expect
+-- only the two restore functions here.
 select proname
 from pg_proc
 join pg_namespace n on n.oid = pg_proc.pronamespace
