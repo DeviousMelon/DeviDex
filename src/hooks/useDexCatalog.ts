@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useOrderedSaves } from '../lib/orderedSaves';
+import { clearProgressRow } from '../lib/progressRows';
 import { useAuth } from '../context/AuthContext';
 import { useGuestProgress } from '../context/GuestProgressContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
@@ -203,13 +204,10 @@ export function useDexCatalog() {
       next,
       async () => {
         // Not owned at all = no row. Keeps the table to what people actually own.
-        // Rows with notes are left alone so unticking never loses a note.
+        // A row with a note is kept (never lose a note) but still has to be
+        // marked unowned, or it would come back ticked on the next load.
         const { error: saveError } = !normalOwned && !shinyOwned
-          ? await client.from('collection_progress')
-              .delete()
-              .eq('user_id', userId)
-              .eq('form_id', formId)
-              .is('notes', null)
+          ? await clearProgressRow(client, 'collection_progress', { user_id: userId, form_id: formId })
           : await client.from('collection_progress').upsert(
               {
                 user_id: userId,
