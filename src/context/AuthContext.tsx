@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -34,6 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  // Which account the profile/loading state currently belongs to. Lets the
+  // auth listener tell "a different person signed in" apart from routine
+  // events for the same person (hourly TOKEN_REFRESHED, USER_UPDATED).
+  const currentUserId = useRef<string | null>(null);
 
   // profiles.role is used by the UI to decide whether /admin should render.
   // IMPORTANT: this is convenience, not the security boundary. PostgreSQL RLS
@@ -47,15 +52,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // select('*') rather than a column list: RLS already limits this to the
     // user's own row, and it keeps sign-in working if the site is deployed
     // before a migration adds a new column (e.g. v1.8's collection_friends_visible).
-    const { data, error } = await supabase
+    const fetchProfile = () => supabase!
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
 
+    let { data, error } = await fetchProfile();
+
+    // A request sent the instant a token is refreshed can be rejected once
+    // (seen in the logs as a 401). One short retry covers that.
+    if (error) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      ({ data, error } = await fetchProfile());
+    }
+
     if (error) {
       console.error('Could not load DeviDex profile:', error.message);
-      setProfile(null);
+      // Keep the profile we already have for this same user: a temporary
+      // network/auth hiccup shouldn't sign an admin out of /admin.
+      setProfile((current) => (current?.id === userId ? current : null));
       return;
     }
 
@@ -82,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const restoredSession = data.session ?? null;
       setSession(restoredSession);
+      currentUserId.current = restoredSession?.user.id ?? null;
 
       if (restoredSession?.user.id) await loadProfile(restoredSession.user.id);
       if (mounted) setLoading(false);
@@ -91,18 +108,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
 
-      if (nextSession?.user.id) {
-        setLoading(true);
-        window.setTimeout(async () => {
-          await loadProfile(nextSession.user.id);
-          if (mounted) setLoading(false);
-        }, 0);
-      } else {
+      const nextUserId = nextSession?.user.id ?? null;
+
+      if (!nextUserId) {
+        currentUserId.current = null;
         setProfile(null);
         setLoading(false);
+        return;
+      }
+
+      if (nextUserId !== currentUserId.current) {
+        // A different account (or a first sign-in): block protected routes
+        // until we know who this is, so nothing flashes for the wrong user.
+        currentUserId.current = nextUserId;
+        setLoading(true);
+        window.setTimeout(async () => {
+          await loadProfile(nextUserId);
+          if (mounted) setLoading(false);
+        }, 0);
+        return;
+      }
+
+      // Same person. TOKEN_REFRESHED fires every hour; showing the loading
+      // screen here unmounted the page and threw away chat/forum drafts.
+      // Refresh the profile quietly only when the account itself changed.
+      if (event === 'USER_UPDATED') {
+        window.setTimeout(() => {
+          void loadProfile(nextUserId);
+        }, 0);
       }
     });
 

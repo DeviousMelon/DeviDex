@@ -51,3 +51,23 @@ Notes:
   see my collection"). The public collection summary is a separate switch.
 - Starter forum categories are created by v1.9. Edit names and descriptions in
   the `forum_categories` table; Announcements only accepts admin posts.
+
+## v2.1: database tune-up and function permissions
+
+Both are **already applied** to the live project (15 Oct 2026). They're here so
+the repo can rebuild the database from scratch. Run after v1.9, in order:
+
+1. `v2.1-db-tuneup.sql`: faster RLS checks, split admin policies, index tidy-up,
+   removes "owns nothing" progress rows (unticking both boxes now deletes the row)
+2. `v2.1.1-function-permissions.sql`: signed-out visitors can no longer call
+   signed-in-only functions; drops the unused `export_own_collection_v2/v3`
+
+Then run `verify-v2.1.sql`. Every row should say `ok = true`.
+
+Notes:
+
+- v1.3 to v1.5.1 had no schema changes, which is why only their `verify-` files exist.
+- `verify-v0.8.sql` and `verify-v1.0.sql` will now show the v2/v3 export
+  functions as missing. That's expected.
+- From now on, commit any SQL you run in the dashboard here as a numbered file,
+  so the repo and the live database don't drift apart again.
