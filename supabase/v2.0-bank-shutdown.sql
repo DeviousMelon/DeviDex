@@ -1,7 +1,10 @@
 -- =============================================================
 -- DeviDex v2.0 - Pokémon Bank shutdown prep
 --
--- Run AFTER v1.9. Safe to rerun during development.
+-- Run AFTER v2.1.1, before deploying the matching frontend. Safe to rerun.
+-- Written to v2.1 standard: policies use (select auth.uid()) and
+-- (select public.is_admin()), and the trigger functions are not callable
+-- over the API.
 --
 -- Pokémon Bank closes for good at 03:00 Irish time on Fri 26 Feb 2027
 -- (7pm PT Thu 25 Feb). After that nothing in Bank, or in any 3DS/DS/GBA game,
@@ -72,23 +75,23 @@ grant select, insert, update, delete on public.ribbon_plans to authenticated;
 drop policy if exists "Users can read own ribbon plans" on public.ribbon_plans;
 create policy "Users can read own ribbon plans"
 on public.ribbon_plans for select to authenticated
-using (auth.uid() = user_id);
+using ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can add own ribbon plans" on public.ribbon_plans;
 create policy "Users can add own ribbon plans"
 on public.ribbon_plans for insert to authenticated
-with check (auth.uid() = user_id);
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can update own ribbon plans" on public.ribbon_plans;
 create policy "Users can update own ribbon plans"
 on public.ribbon_plans for update to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can delete own ribbon plans" on public.ribbon_plans;
 create policy "Users can delete own ribbon plans"
 on public.ribbon_plans for delete to authenticated
-using (auth.uid() = user_id);
+using ((select auth.uid()) = user_id);
 
 -- No one can hoard thousands of plans by accident (or on purpose).
 create or replace function public.ribbon_plans_limit()
@@ -104,6 +107,9 @@ begin
   return new;
 end;
 $$;
+
+-- Trigger function: not callable over the API (same as v2.1.1). The trigger still fires.
+revoke execute on function public.ribbon_plans_limit() from public, anon, authenticated;
 
 drop trigger if exists ribbon_plans_limit on public.ribbon_plans;
 create trigger ribbon_plans_limit
@@ -143,23 +149,23 @@ grant select, insert, update, delete on public.bank_checklist to authenticated;
 drop policy if exists "Users can read own bank checklist" on public.bank_checklist;
 create policy "Users can read own bank checklist"
 on public.bank_checklist for select to authenticated
-using (auth.uid() = user_id);
+using ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can add to own bank checklist" on public.bank_checklist;
 create policy "Users can add to own bank checklist"
 on public.bank_checklist for insert to authenticated
-with check (auth.uid() = user_id);
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can update own bank checklist" on public.bank_checklist;
 create policy "Users can update own bank checklist"
 on public.bank_checklist for update to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can delete from own bank checklist" on public.bank_checklist;
 create policy "Users can delete from own bank checklist"
 on public.bank_checklist for delete to authenticated
-using (auth.uid() = user_id);
+using ((select auth.uid()) = user_id);
 
 -- Bank itself holds 3,000, so that's a sensible ceiling.
 create or replace function public.bank_checklist_limit()
@@ -175,6 +181,9 @@ begin
   return new;
 end;
 $$;
+
+-- Trigger function: not callable over the API (same as v2.1.1). The trigger still fires.
+revoke execute on function public.bank_checklist_limit() from public, anon, authenticated;
 
 drop trigger if exists bank_checklist_limit on public.bank_checklist;
 create trigger bank_checklist_limit
@@ -225,23 +234,23 @@ using (is_published);
 drop policy if exists "Users can read published last-chance entries" on public.bank_last_chance;
 create policy "Users can read published last-chance entries"
 on public.bank_last_chance for select to authenticated
-using (is_published or public.is_admin());
+using (is_published or (select public.is_admin()));
 
 drop policy if exists "Admins can add last-chance entries" on public.bank_last_chance;
 create policy "Admins can add last-chance entries"
 on public.bank_last_chance for insert to authenticated
-with check (public.is_admin());
+with check ((select public.is_admin()));
 
 drop policy if exists "Admins can update last-chance entries" on public.bank_last_chance;
 create policy "Admins can update last-chance entries"
 on public.bank_last_chance for update to authenticated
-using (public.is_admin())
-with check (public.is_admin());
+using ((select public.is_admin()))
+with check ((select public.is_admin()));
 
 drop policy if exists "Admins can delete last-chance entries" on public.bank_last_chance;
 create policy "Admins can delete last-chance entries"
 on public.bank_last_chance for delete to authenticated
-using (public.is_admin());
+using ((select public.is_admin()));
 
 -- Your own ticks on that list.
 create table if not exists public.bank_last_chance_done (
@@ -258,17 +267,17 @@ grant select, insert, delete on public.bank_last_chance_done to authenticated;
 drop policy if exists "Users can read own last-chance ticks" on public.bank_last_chance_done;
 create policy "Users can read own last-chance ticks"
 on public.bank_last_chance_done for select to authenticated
-using (auth.uid() = user_id);
+using ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can add own last-chance ticks" on public.bank_last_chance_done;
 create policy "Users can add own last-chance ticks"
 on public.bank_last_chance_done for insert to authenticated
-with check (auth.uid() = user_id);
+with check ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can remove own last-chance ticks" on public.bank_last_chance_done;
 create policy "Users can remove own last-chance ticks"
 on public.bank_last_chance_done for delete to authenticated
-using (auth.uid() = user_id);
+using ((select auth.uid()) = user_id);
 
 -- -------------------------------------------------------------
 -- 5. Starter last-chance entries
@@ -328,4 +337,7 @@ as $$
 $$;
 
 revoke all on function public.get_bank_prep_summary() from public, anon;
-grant execute on function public.get_bank_prep_summary() to authenticated;
+grant execute on function public.get_bank_prep_summary() to authenticated, service_role;
+
+-- Let the API see the new tables and function straight away.
+notify pgrst, 'reload schema';

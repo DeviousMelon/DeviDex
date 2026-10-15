@@ -15,7 +15,20 @@ from (values
   ('RLS on bank_last_chance_done', (select relrowsecurity from pg_class where oid = 'public.bank_last_chance_done'::regclass)),
   ('starter last-chance entries exist', (select count(*) from public.bank_last_chance) >= 9),
   ('summary function exists', to_regprocedure('public.get_bank_prep_summary()') is not null),
-  ('visitors cannot call summary', not has_function_privilege('anon', 'public.get_bank_prep_summary()', 'EXECUTE'))
+  ('visitors cannot call summary', not has_function_privilege('anon', 'public.get_bank_prep_summary()', 'EXECUTE')),
+  ('signed-in users can call summary', has_function_privilege('authenticated', 'public.get_bank_prep_summary()', 'EXECUTE')),
+  ('plan limit not callable over API', not has_function_privilege('authenticated', 'public.ribbon_plans_limit()', 'EXECUTE')
+                                       and not has_function_privilege('anon', 'public.ribbon_plans_limit()', 'EXECUTE')),
+  ('checklist limit not callable over API', not has_function_privilege('authenticated', 'public.bank_checklist_limit()', 'EXECUTE')
+                                            and not has_function_privilege('anon', 'public.bank_checklist_limit()', 'EXECUTE')),
+  -- Strip the fast "(SELECT ...)" form; anything left over is a per-row call.
+  ('bank policies use fast (select ...) form', not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename in ('ribbon_plans', 'bank_checklist', 'bank_last_chance', 'bank_last_chance_done')
+      and replace(replace(coalesce(qual, '') || ' ' || coalesce(with_check, ''),
+                          'SELECT auth.uid()', ''), 'SELECT is_admin()', '')
+          ~ '(auth\.uid|is_admin)\(\)'))
 ) as checks(check_name, ok);
 
 select
