@@ -1,3 +1,6 @@
+-- NOTE (v2.1.1): this file creates public.export_own_collection_v3(), which v2.1.1 drops on
+-- purpose. If you ever re-run this file, run migrations/020_function_permissions.sql again.
+
 -- =============================================================
 -- DeviDex v1.0 - Phase 5: Collection presets + saved setups
 --
