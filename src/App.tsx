@@ -20,6 +20,7 @@ import { ChatPage } from './pages/ChatPage';
 import { ForumsPage } from './pages/ForumsPage';
 import { ForumPostPage } from './pages/ForumPostPage';
 import { NewForumPostPage } from './pages/NewForumPostPage';
+import { BankPage } from './pages/BankPage';
 
 function LegacyCollectionsRedirect() {
   const location = useLocation();
@@ -42,6 +43,9 @@ function App() {
         <Route path="/games" element={<GameDexesPage />} />
         <Route path="/games/:gameSlug" element={<GameDexPage />} />
         <Route path="/pokemon/:speciesSlug" element={<PokemonDetailPage />} />
+
+        {/* v2.0: Pokémon Bank shutdown prep. Public; checklist and plans need an account. */}
+        <Route path="/bank" element={<BankPage />} />
 
         {/* Public user pages. */}
         <Route path="/u/:username" element={<PublicProfilePage />} />

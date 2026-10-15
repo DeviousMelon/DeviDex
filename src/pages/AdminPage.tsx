@@ -1,3 +1,4 @@
+import { AdminBankList } from '../components/AdminBankList';
 import { AdminDataTools } from '../components/AdminDataTools';
 import { AdminReports } from '../components/AdminReports';
 import { PageHeader } from '../components/PageHeader';
@@ -17,6 +18,7 @@ export function AdminPage() {
         description={<>Signed in as <strong>{profile?.username || user?.email}</strong>. Reports first, then the Pokédex data tools.</>}
       />
       <AdminReports />
+      <AdminBankList />
       <AdminDataTools />
     </main>
   );

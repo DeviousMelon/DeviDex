@@ -52,6 +52,22 @@ Notes:
 - Starter forum categories are created by v1.9. Edit names and descriptions in
   the `forum_categories` table; Announcements only accepts admin posts.
 
+## v2.0: Pokémon Bank shutdown prep
+
+Run `v2.0-bank-shutdown.sql` in the SQL Editor **before** deploying the
+matching frontend, then `verify-v2.0.sql`. Every row should say `ok = true`.
+Safe to rerun.
+
+- `bank_checklist` and `ribbon_plans` are private per user (RLS) and are
+  removed by `delete_own_account()` through the profile cascade.
+- `bank_last_chance` is public to read and admin-only to edit, from the Admin
+  page. Rerunning the migration refreshes the nine starter entries' wording
+  but never re-publishes one you've hidden.
+- The ribbon list is in `src/lib/bankRibbons.ts`, not the database. Plans only
+  store ribbon ids, so never rename an id once people are using it.
+- The deadline lives in one place: `BANK_DEADLINE` in `src/lib/bank.ts`.
+  The nav link disappears after it; `/bank` stays up as a record.
+
 ## v2.1: database tune-up and function permissions
 
 Both are **already applied** to the live project (15 Oct 2026). They're here so
