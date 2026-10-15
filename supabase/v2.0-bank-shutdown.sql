@@ -210,7 +210,7 @@ create table if not exists public.bank_last_chance (
 );
 
 create index if not exists bank_last_chance_species_idx on public.bank_last_chance (species_id) where species_id is not null;
-create index if not exists bank_last_chance_form_idx on public.bank_last_chance (form_id);
+create index if not exists bank_last_chance_form_idx on public.bank_last_chance (form_id) where form_id is not null;
 
 drop trigger if exists bank_last_chance_set_updated_at on public.bank_last_chance;
 create trigger bank_last_chance_set_updated_at
