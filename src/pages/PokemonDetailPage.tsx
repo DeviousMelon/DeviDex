@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { BankLastChanceNotice } from '../components/BankLastChanceNotice';
 import { EvolutionChain } from '../components/EvolutionChain';
 import { MoveLearnset } from '../components/MoveLearnset';
 import { PokemonGameContextSelector } from '../components/PokemonGameContext';
@@ -515,6 +516,8 @@ export function PokemonDetailPage() {
             {speciesDetail?.is_baby && <span className="pokemon-tag">Baby</span>}
             {selectedForm.is_battle_only && <span className="pokemon-tag">Battle-only form</span>}
           </div>
+
+          <BankLastChanceNotice speciesId={species.id} formIds={forms.map((form) => form.id)} />
 
           {entry && (
             <figure className="pokemon-hero__entry">
