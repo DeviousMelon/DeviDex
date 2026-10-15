@@ -210,7 +210,7 @@ create table if not exists public.bank_last_chance (
 );
 
 create index if not exists bank_last_chance_species_idx on public.bank_last_chance (species_id) where species_id is not null;
-create index if not exists bank_last_chance_form_idx on public.bank_last_chance (form_id) where form_id is not null;
+create index if not exists bank_last_chance_form_idx on public.bank_last_chance (form_id);
 
 drop trigger if exists bank_last_chance_set_updated_at on public.bank_last_chance;
 create trigger bank_last_chance_set_updated_at
@@ -338,6 +338,12 @@ $$;
 
 revoke all on function public.get_bank_prep_summary() from public, anon;
 grant execute on function public.get_bank_prep_summary() to authenticated, service_role;
+
+-- Foreign-key indexes the Supabase performance advisor asks for. The
+-- entry_id one also keeps deleting a last-chance entry fast.
+create index if not exists ribbon_plans_form_idx on public.ribbon_plans (form_id);
+create index if not exists bank_checklist_form_idx on public.bank_checklist (form_id);
+create index if not exists bank_last_chance_done_entry_idx on public.bank_last_chance_done (entry_id);
 
 -- Let the API see the new tables and function straight away.
 notify pgrst, 'reload schema';
