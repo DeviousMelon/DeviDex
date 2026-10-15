@@ -1,3 +1,6 @@
+-- NOTE (v2.1.1): this file creates public.export_own_collection_v2(), which v2.1.1 drops on
+-- purpose. If you ever re-run this file, run v2.1.1-function-permissions.sql again.
+
 -- =============================================================
 -- DeviDex v0.8 - Phase 3: Collection Data Safety
 -- Run AFTER v0.7.2-account-stability-rollback.sql.
