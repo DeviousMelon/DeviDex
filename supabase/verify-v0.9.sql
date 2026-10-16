@@ -1,3 +1,6 @@
+-- Since v2.2, the form_category_counts view no longer exists, so the last query
+-- below errors. That's expected.
+
 -- DeviDex v0.9 verification
 select
   column_name,

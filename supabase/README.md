@@ -87,3 +87,15 @@ Notes:
   functions as missing. That's expected.
 - From now on, commit any SQL you run in the dashboard here as a numbered file,
   so the repo and the live database don't drift apart again.
+
+## v2.2: drop unused database objects
+
+`v2.2-drop-unused-objects.sql` drops two things nothing uses:
+
+- `game_dex_entries`, the old per-game Dex table, replaced by
+  `game_dex_set_entries` in v1.1 (it was the biggest table, at 2.4 MB)
+- the `form_category_counts` view from v0.9
+
+Then run `verify-v2.2.sql`. Re-running v0.3, v0.4 or v0.9 recreates both, so
+run v2.2 again after any of those. `verify-v0.4.sql` and `verify-v0.9.sql`
+will now error on the dropped objects; that's expected.

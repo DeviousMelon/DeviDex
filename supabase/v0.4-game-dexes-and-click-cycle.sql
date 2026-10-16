@@ -1,3 +1,6 @@
+-- NOTE (v2.2): the game_dex_entries changes below are for a table v2.2 drops.
+-- If you re-run this file, run v2.2-drop-unused-objects.sql again afterwards.
+
 -- =============================================================
 -- DeviDex v0.4 - individual Game Dex progress foundation
 --
