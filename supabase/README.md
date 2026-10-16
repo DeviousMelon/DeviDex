@@ -41,13 +41,14 @@ lives in `package.json` and on the git tags.
 | 019 | `019_db_tuneup.sql` | RLS speed-ups, policy split, index tidy-up | v2.1 |
 | 020 | `020_function_permissions.sql` | Signed-in-only functions locked down | v2.1.1 |
 | 021 | `021_drop_unused_objects.sql` | Drops two unused objects | v2.2 |
+| 022 | `022_reference_data.sql` | Types, moves, abilities, items, learnsets for the Tools | v2.2 (reference data) |
 
 "Old name" is the label the file had before the renumbering. Older code comments
 (for example "v0.9 compatibility mirror" or "the v1.8 column") use those labels.
 The releases built locally as v1.3, v1.4, v1.5 and v1.5.1 changed no schema, so
 they have no migration; `checks/catalogue.sql` covers what they relied on.
 
-**Live database status:** 001 to 020 are applied. 021 has not been run yet.
+**Live database status:** 001 to 020 are applied. 021 and 022 have not been run yet.
 
 ## First-time setup
 
@@ -142,3 +143,31 @@ Notes:
 Then run `checks/021_drop_unused_objects.sql`. Re-running 002, 003 or 010 recreates
 both, so run 021 again after any of those. `checks/003_game_dexes_and_click_cycle.sql`
 and `checks/010_forms.sql` will now error on the dropped objects; that's expected.
+
+## 022: reference data foundation
+
+Shared game data for the upcoming calculators, type chart and search tools:
+types and the type chart (including old-generation charts), moves, abilities,
+items, natures, egg groups, catch rates, base stats, and learnsets.
+
+1. Run `migrations/022_reference_data.sql` in the SQL Editor. Safe to rerun.
+2. Run `checks/022_reference_data.sql`. Checks 1–9 should say `ok = true` straight away.
+3. Deploy the frontend, then on the **Admin** page press
+   **Import reference data** (a minute or two; it downloads ~15 MB from PokéAPI).
+4. Run `checks/022_reference_data.sql` again. Now every row should say `ok = true`.
+
+Notes:
+
+- Everything is public to read, admin-only to write, and holds no user data.
+  Re-syncing can't touch anyone's saves.
+- Pokémon detail pages still fetch PokéAPI on demand. These tables are for
+  questions across many Pokémon at once ("who can pass down Wish as an egg move?").
+- `ref_pokemon` is keyed by PokéAPI Pokémon id (10001+ are forms). Use the
+  `ref_form_pokemon` view to get from a `pokemon_forms` row to its stats/types.
+- Learnsets are folded: one row per Pokémon + move + method + level, with
+  `version_group_ids` listing every game it applies to. Filter a game with
+  `version_group_ids @> '{25}'` (or `.contains()` in supabase-js).
+- Past type charts and past typings are stored as "applied up to and including
+  `until_generation`".
+- Re-run the importer after a new game/DLC, and after re-syncing the National
+  Dex (only species already in `pokemon_species` are imported).
