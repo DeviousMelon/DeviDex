@@ -44,6 +44,7 @@ export function SiteHeader() {
     <>
       <NavLink to="/national-dex" className={navClass}>National Dex</NavLink>
       <NavLink to="/games" className={navClass}>Game Dexes</NavLink>
+      <NavLink to="/tools" className={navClass}>Tools</NavLink>
       <NavLink to="/forums" className={navClass}>Forums</NavLink>
       {bankOpen && (
         <NavLink to="/bank" className={navClass} aria-label={`Bank shutdown, ${bankDays} days left`}>

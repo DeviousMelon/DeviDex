@@ -171,3 +171,6 @@ Notes:
   `until_generation`".
 - Re-run the importer after a new game/DLC, and after re-syncing the National
   Dex (only species already in `pokemon_species` are imported).
+- The Tools pages (`/tools`) and the Type matchups panel on Pokémon pages read
+  these tables. Until the import has run they show a "hasn't been imported
+  yet" message (the matchups panel just stays hidden).
