@@ -262,9 +262,6 @@ code { padding:2px 5px; border-radius:6px; background:rgba(37,38,39,.07); font-f
 /* =========================================================
    v0.3: real Living Dex database + collection engine
    ========================================================= */
-.collection-search { width:min(360px,100%); display:grid; gap:7px; color:var(--muted); font-size:.78rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
-.collection-search input { width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:13px; outline:none; color:var(--dark); background:var(--white); font-size:.95rem; text-transform:none; letter-spacing:0; }
-.collection-search input:focus { border-color:var(--blue); box-shadow:0 0 0 3px var(--soft-blue); }
 .dex-empty-state { margin-top:28px; padding:60px 28px; display:grid; place-items:center; gap:10px; border:1px dashed rgba(37,38,39,.18); border-radius:24px; color:var(--muted); background:rgba(255,255,255,.58); text-align:center; }
 .dex-empty-state strong { color:var(--dark); font-size:1.15rem; }
 .dex-empty-state p { max-width:650px; margin:0; line-height:1.55; }
@@ -288,7 +285,6 @@ code { padding:2px 5px; border-radius:6px; background:rgba(37,38,39,.07); font-f
 .admin-curation-note p { margin:6px 0 0; color:var(--muted); line-height:1.55; }
 
 @media (max-width:900px) {
-  .collection-search { width:100%; }
   .admin-data-counts { grid-template-columns:1fr 1fr; }
   .admin-import-card { align-items:stretch; flex-direction:column; }
   .admin-import-card .button { align-self:flex-start; }
@@ -774,8 +770,3 @@ code { padding:2px 5px; border-radius:6px; background:rgba(37,38,39,.07); font-f
 /* Dex tiles remain click-anywhere status controls, while this small info link
    gives mouse, touch and keyboard users a deliberate way into the detail page. */
 
-.button--gold {
-  border-color: rgba(234, 196, 53, .75) !important;
-  color: #6d5a09 !important;
-  background: var(--gold) !important;
-}

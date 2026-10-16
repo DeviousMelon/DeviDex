@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { cleanError, type Result } from './social';
+import { cleanError, NOT_CONFIGURED, type Result, type Row } from './rpc';
 import type { RibbonOrigin, RibbonStage } from './bankRibbons';
 
 // v2.0: Pokémon Bank shutdown prep.
@@ -38,9 +38,6 @@ export function deadlineInLocalTime() {
     timeZoneName: 'short',
   });
 }
-
-type Row = Record<string, unknown>;
-const NOT_CONFIGURED = 'Supabase is not configured.';
 
 // ---------------------------------------------------------------------------
 // Front-page summary

@@ -102,12 +102,6 @@ export function humanizeApiName(value: string) {
     .join(' ');
 }
 
-export function latestEnglishFlavorText(species: PokemonSpeciesDetail) {
-  const english = species.flavor_text_entries.filter((entry) => entry.language.name === 'en');
-  const latest = english.at(-1)?.flavor_text ?? '';
-  return latest.replace(/[\n\f\r]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
 /**
  * The Pokédex entry for the selected game. PokéAPI is missing entries for some
  * games (Scarlet/Violet, for one), so this falls back to the newest English
@@ -258,37 +252,6 @@ export function formatMachineItemName(slug: string) {
   if (match) return `${match[1].toUpperCase()}${match[2].padStart(2, '0')}`;
   return humanizeApiName(slug);
 }
-
-
-export const versionGroupOrder = [
-  'red-blue',
-  'yellow',
-  'gold-silver',
-  'crystal',
-  'ruby-sapphire',
-  'emerald',
-  'firered-leafgreen',
-  'diamond-pearl',
-  'platinum',
-  'heartgold-soulsilver',
-  'black-white',
-  'black-2-white-2',
-  'x-y',
-  'omega-ruby-alpha-sapphire',
-  'sun-moon',
-  'ultra-sun-ultra-moon',
-  'lets-go-pikachu-lets-go-eevee',
-  'sword-shield',
-  'the-isle-of-armor',
-  'the-crown-tundra',
-  'brilliant-diamond-shining-pearl',
-  'legends-arceus',
-  'scarlet-violet',
-  'the-teal-mask',
-  'the-indigo-disk',
-  'legends-za',
-  'mega-dimension',
-] as const;
 
 const moveDetailCache = new Map<string, Promise<MoveDetail>>();
 const machineDetailCache = new Map<string, Promise<MachineDetail>>();
@@ -513,11 +476,6 @@ const SPECIAL_TARGET_SUMMARY: Record<string, string> = {
   alcremie: 'Hold a Sweet and spin your character · the Sweet, time of day and spin pick the flavour',
   toxtricity: 'Level up to Lv. 30 · its Nature decides Amped or Low Key form',
 };
-
-export function evolutionRequirementSummary(detail: EvolutionDetail, targetSpeciesSlug?: string, fromSpeciesSlug?: string) {
-  if (targetSpeciesSlug && SPECIAL_TARGET_SUMMARY[targetSpeciesSlug]) return SPECIAL_TARGET_SUMMARY[targetSpeciesSlug];
-  return [...baseRequirements(detail, targetSpeciesSlug), ...formRequirements(detail, { fromSpecies: fromSpeciesSlug, toSpecies: targetSpeciesSlug })].join(' · ');
-}
 
 function baseRequirements(detail: EvolutionDetail, targetSpeciesSlug?: string, hideRegion = false) {
   const requirements: string[] = [triggerSummary(detail)];

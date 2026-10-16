@@ -1,10 +1,9 @@
 import { supabase } from './supabase';
+import { callRpc, nothing, rows, type Row } from './rpc';
 
 // Thin wrappers around the v1.6+ social database functions. Every write is a
 // database function that checks permissions server-side; these helpers only
 // tidy up the shapes and error messages for React.
-
-export type Result<T = null> = { data: T; error: string | null };
 
 /** The small public shape the database hands back for other collectors. */
 export interface SocialUser {
@@ -58,16 +57,6 @@ export interface AdminReport {
   resolvedByUsername: string | null;
 }
 
-type Row = Record<string, unknown>;
-
-const NOT_CONFIGURED = 'Supabase is not configured.';
-
-/** Supabase prefixes database errors with nothing useful; keep the message only. */
-export function cleanError(message: string | undefined | null): string | null {
-  if (!message) return null;
-  return message.replace(/^.*?ERROR:\s*/, '');
-}
-
 export function toSocialUser(row: Row): SocialUser {
   return {
     userId: String(row.user_id),
@@ -90,22 +79,12 @@ export function socialName(user: Pick<SocialUser, 'displayName' | 'username'>) {
   return user.displayName?.trim() || user.username;
 }
 
-async function rpc<T>(name: string, args: Record<string, unknown> | undefined, map: (data: unknown) => T, fallback: T): Promise<Result<T>> {
-  if (!supabase) return { data: fallback, error: NOT_CONFIGURED };
-  const { data, error } = await supabase.rpc(name, args);
-  if (error) return { data: fallback, error: cleanError(error.message) };
-  return { data: map(data), error: null };
-}
-
-const rows = (data: unknown) => (Array.isArray(data) ? (data as Row[]) : []);
-const nothing = () => null;
-
 // ---- Friends ---------------------------------------------------------------
 
 export type FriendRequestOutcome = 'requested' | 'accepted' | 'already_requested' | 'already_friends';
 
 export function sendFriendRequest(username: string) {
-  return rpc<FriendRequestOutcome | null>(
+  return callRpc<FriendRequestOutcome | null>(
     'send_friend_request',
     { target_username: username.trim().replace(/^@/, '') },
     (data) => data as FriendRequestOutcome,
@@ -114,23 +93,23 @@ export function sendFriendRequest(username: string) {
 }
 
 export function respondToFriendRequest(friendshipId: string, accept: boolean) {
-  return rpc('respond_friend_request', { request_id: friendshipId, accept }, nothing, null);
+  return callRpc('respond_friend_request', { request_id: friendshipId, accept }, nothing, null);
 }
 
 export function removeFriend(userId: string) {
-  return rpc('remove_friend', { other_user: userId }, nothing, null);
+  return callRpc('remove_friend', { other_user: userId }, nothing, null);
 }
 
 export function blockUser(userId: string) {
-  return rpc('block_user', { other_user: userId }, nothing, null);
+  return callRpc('block_user', { other_user: userId }, nothing, null);
 }
 
 export function unblockUser(userId: string) {
-  return rpc('unblock_user', { other_user: userId }, nothing, null);
+  return callRpc('unblock_user', { other_user: userId }, nothing, null);
 }
 
 export function getMyFriends() {
-  return rpc<FriendEntry[]>('get_my_friends', undefined, (data) => rows(data).map((row) => ({
+  return callRpc<FriendEntry[]>('get_my_friends', undefined, (data) => rows(data).map((row) => ({
     ...toSocialUser(row),
     friendshipId: String(row.friendship_id),
     relationship: row.relationship as FriendRelationship,
@@ -139,14 +118,14 @@ export function getMyFriends() {
 }
 
 export function getMyBlockedUsers() {
-  return rpc<BlockedUser[]>('get_my_blocked_users', undefined, (data) => rows(data).map((row) => ({
+  return callRpc<BlockedUser[]>('get_my_blocked_users', undefined, (data) => rows(data).map((row) => ({
     ...toSocialUser(row),
     blockedAt: String(row.blocked_at),
   })), []);
 }
 
 export function getRelationship(username: string) {
-  return rpc<{ userId: string; relationship: ProfileRelationship } | null>(
+  return callRpc<{ userId: string; relationship: ProfileRelationship } | null>(
     'get_relationship',
     { other_username: username },
     (data) => {
@@ -160,7 +139,7 @@ export function getRelationship(username: string) {
 // ---- Reports ---------------------------------------------------------------
 
 export function submitReport(targetType: ReportTargetType, targetId: string, reason: ReportReason, details: string) {
-  return rpc<string | null>(
+  return callRpc<string | null>(
     'submit_report',
     { report_target_type: targetType, report_target_id: targetId, report_reason: reason, report_details: details },
     (data) => (data as string) ?? null,
@@ -169,7 +148,7 @@ export function submitReport(targetType: ReportTargetType, targetId: string, rea
 }
 
 export function getReports(status: ReportStatus | 'all') {
-  return rpc<AdminReport[]>('get_reports', { status_filter: status }, (data) => rows(data).map((row) => ({
+  return callRpc<AdminReport[]>('get_reports', { status_filter: status }, (data) => rows(data).map((row) => ({
     id: String(row.id),
     targetType: row.target_type as ReportTargetType,
     targetId: String(row.target_id),
@@ -188,7 +167,7 @@ export function getReports(status: ReportStatus | 'all') {
 }
 
 export function resolveReport(reportId: string, status: ReportStatus, note: string) {
-  return rpc('resolve_report', { report_id: reportId, new_status: status, note }, nothing, null);
+  return callRpc('resolve_report', { report_id: reportId, new_status: status, note }, nothing, null);
 }
 
 // ---- Formatting ------------------------------------------------------------
