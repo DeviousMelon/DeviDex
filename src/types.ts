@@ -1,23 +1,7 @@
 // Shared TypeScript shapes used across DeviDex.
 // Keeping these central makes it easier to replace hand-written types with
 // generated Supabase database types later without rewriting every component.
-export type DexStatus = 'owned' | 'missing' | 'shiny';
-
 export type FormCategory = 'default' | 'regional' | 'alternate' | 'pattern' | 'gender' | 'battle' | 'special';
-
-export interface PokemonPreview {
-  dexNumber: number;
-  name: string;
-  status: DexStatus;
-}
-
-export interface ProgressCardData {
-  label: string;
-  current: number;
-  total: number;
-  detail: string;
-  tone: 'blue' | 'gold' | 'orange';
-}
 
 export type UserRole = 'user' | 'admin';
 
@@ -98,15 +82,6 @@ export interface CollectionProgress {
   formId: number;
   normalOwned: boolean;
   shinyOwned: boolean;
-}
-
-// A main-series game shown on the Game Dexes landing page.
-export interface GameSummary {
-  id: number;
-  slug: string;
-  name: string;
-  generation: number;
-  releaseOrder: number;
 }
 
 // One species entry inside an individual game's Pokédex. dexNumber is the

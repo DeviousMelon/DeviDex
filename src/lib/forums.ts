@@ -1,5 +1,5 @@
-import { supabase } from './supabase';
-import { cleanError, toSocialUser, type Result, type SocialUser } from './social';
+import { callRpc, nothing, rows, type Row } from './rpc';
+import { toSocialUser, type SocialUser } from './social';
 
 // v1.9 forums. Reads work signed out; writes need an account with a username.
 
@@ -49,10 +49,6 @@ export interface ForumComment extends ForumAuthorFields {
   depth: number;
 }
 
-type Row = Record<string, unknown>;
-const NOT_CONFIGURED = 'Supabase is not configured.';
-const rows = (data: unknown) => (Array.isArray(data) ? (data as Row[]) : []);
-
 function authorFields(row: Row): ForumAuthorFields {
   return {
     author: row.author_id
@@ -93,17 +89,8 @@ function toPost(row: Row): ForumPost {
   };
 }
 
-async function call<T>(name: string, args: Record<string, unknown> | undefined, map: (data: unknown) => T, fallback: T): Promise<Result<T>> {
-  if (!supabase) return { data: fallback, error: NOT_CONFIGURED };
-  const { data, error } = await supabase.rpc(name, args);
-  if (error) return { data: fallback, error: cleanError(error.message) };
-  return { data: map(data), error: null };
-}
-
-const nothing = () => null;
-
 export function listForumCategories() {
-  return call<ForumCategory[]>('list_forum_categories', undefined, (data) => rows(data).map((row) => ({
+  return callRpc<ForumCategory[]>('list_forum_categories', undefined, (data) => rows(data).map((row) => ({
     id: Number(row.id),
     slug: String(row.slug),
     name: String(row.name),
@@ -117,7 +104,7 @@ export function listForumCategories() {
 export const FORUM_PAGE_SIZE = 25;
 
 export function listForumPosts(category: string | null, sort: ForumSort, page: number) {
-  return call<ForumPost[]>(
+  return callRpc<ForumPost[]>(
     'list_forum_posts',
     { category_slug: category, sort_by: sort, page_limit: FORUM_PAGE_SIZE, page_offset: page * FORUM_PAGE_SIZE },
     (data) => rows(data).map(toPost),
@@ -126,14 +113,14 @@ export function listForumPosts(category: string | null, sort: ForumSort, page: n
 }
 
 export function getForumPost(postId: string) {
-  return call<ForumPost | null>('get_forum_post', { post: postId }, (data) => {
+  return callRpc<ForumPost | null>('get_forum_post', { post: postId }, (data) => {
     const row = rows(data)[0];
     return row ? toPost(row) : null;
   }, null);
 }
 
 export function getForumComments(postId: string) {
-  return call<ForumComment[]>('get_forum_comments', { post: postId }, (data) => rows(data).map((row) => ({
+  return callRpc<ForumComment[]>('get_forum_comments', { post: postId }, (data) => rows(data).map((row) => ({
     ...authorFields(row),
     id: String(row.id),
     parentId: (row.parent_id as string | null) ?? null,
@@ -143,7 +130,7 @@ export function getForumComments(postId: string) {
 }
 
 export function createForumPost(category: string, title: string, body: string, pokemonFormId: number | null) {
-  return call<string | null>(
+  return callRpc<string | null>(
     'create_forum_post',
     { category, post_title: title, post_body: body, shared_form_id: pokemonFormId },
     (data) => (data as string) ?? null,
@@ -152,37 +139,37 @@ export function createForumPost(category: string, title: string, body: string, p
 }
 
 export function editForumPost(postId: string, title: string, body: string) {
-  return call('edit_forum_post', { post: postId, post_title: title, post_body: body }, nothing, null);
+  return callRpc('edit_forum_post', { post: postId, post_title: title, post_body: body }, nothing, null);
 }
 
 export function deleteForumPost(postId: string) {
-  return call('delete_forum_post', { post: postId }, nothing, null);
+  return callRpc('delete_forum_post', { post: postId }, nothing, null);
 }
 
 export function createForumComment(postId: string, parentId: string | null, body: string) {
-  return call<string | null>('create_forum_comment', { post: postId, parent: parentId, comment_body: body }, (data) => (data as string) ?? null, null);
+  return callRpc<string | null>('create_forum_comment', { post: postId, parent: parentId, comment_body: body }, (data) => (data as string) ?? null, null);
 }
 
 export function editForumComment(commentId: string, body: string) {
-  return call('edit_forum_comment', { comment: commentId, comment_body: body }, nothing, null);
+  return callRpc('edit_forum_comment', { comment: commentId, comment_body: body }, nothing, null);
 }
 
 export function deleteForumComment(commentId: string) {
-  return call('delete_forum_comment', { comment: commentId }, nothing, null);
+  return callRpc('delete_forum_comment', { comment: commentId }, nothing, null);
 }
 
 export function voteForumPost(postId: string, vote: Vote) {
-  return call<number | null>('vote_forum_post', { post: postId, vote }, (data) => Number(data), null);
+  return callRpc<number | null>('vote_forum_post', { post: postId, vote }, (data) => Number(data), null);
 }
 
 export function voteForumComment(commentId: string, vote: Vote) {
-  return call<number | null>('vote_forum_comment', { comment: commentId, vote }, (data) => Number(data), null);
+  return callRpc<number | null>('vote_forum_comment', { comment: commentId, vote }, (data) => Number(data), null);
 }
 
 export function adminSetForumPostFlags(postId: string, pinned: boolean | null, locked: boolean | null) {
-  return call('admin_set_forum_post_flags', { post: postId, pinned, locked }, nothing, null);
+  return callRpc('admin_set_forum_post_flags', { post: postId, pinned, locked }, nothing, null);
 }
 
 export function adminRemoveForumContent(kind: 'post' | 'comment', id: string) {
-  return call('admin_remove_forum_content', { content_kind: kind, content: id }, nothing, null);
+  return callRpc('admin_remove_forum_content', { content_kind: kind, content: id }, nothing, null);
 }
