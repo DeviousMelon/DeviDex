@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { inheritedVersionGroupsForContext } from '../lib/gameContext';
 import {
   fetchMachineDetail,
@@ -127,6 +128,9 @@ function MoveRow({ row }: { row: LearnsetRow }) {
                 {detail.priority !== 0 && <span>Priority <strong>{detail.priority > 0 ? `+${detail.priority}` : detail.priority}</strong></span>}
               </div>
               {effect && <p className="move-row__effect">{effect}</p>}
+              <Link className="move-row__learners" to={`/tools/moves?move=${encodeURIComponent(row.moveSlug)}&vg=${encodeURIComponent(row.sourceVersionGroup)}`}>
+                Who else learns this?
+              </Link>
             </>
           )}
         </div>
