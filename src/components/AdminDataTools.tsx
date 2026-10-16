@@ -15,12 +15,6 @@ type DataCounts = {
 type NamedResource = { name: string; url: string };
 type PokeApiListResponse = { results: NamedResource[] };
 
-type VersionGroupDetail = {
-  name: string;
-  versions: NamedResource[];
-  pokedexes: NamedResource[];
-};
-
 type PokedexDetail = {
   name: string;
   names: Array<{ name: string; language: NamedResource }>;
@@ -46,8 +40,6 @@ type PokemonFormDetail = {
   };
   form_names: Array<{ name: string; language: NamedResource }>;
 };
-
-type GameRow = { id: number; slug: string; name: string };
 type SharedDexSetRow = { id: number; slug: string; name: string; source_pokedex_slugs: string[] };
 type SpeciesRow = { id: number; slug: string; name: string; national_dex_number: number };
 

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import { cleanError, toSocialUser, type Result, type SocialUser } from './social';
+import { cleanError, NOT_CONFIGURED, type Result, type Row } from './rpc';
+import { toSocialUser, type SocialUser } from './social';
 
 // v1.8: comparing collections with friends and managing your trade list.
 
@@ -23,9 +24,6 @@ export interface TradeListEntry {
   note: string | null;
   createdAt: string;
 }
-
-type Row = Record<string, unknown>;
-const NOT_CONFIGURED = 'Supabase is not configured.';
 
 export async function getFriendCompareInfo(username: string): Promise<Result<{ status: CompareStatus; friend: SocialUser | null }>> {
   if (!supabase) return { data: { status: 'not_friends', friend: null }, error: NOT_CONFIGURED };

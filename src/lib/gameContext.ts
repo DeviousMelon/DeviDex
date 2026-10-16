@@ -205,18 +205,6 @@ export function versionLabel(version: string) {
   return family?.versions.find((candidate) => candidate.slug === version)?.label ?? version;
 }
 
-export function defaultContextForGeneration(generation: GenerationNumber): PokemonGameContext {
-  const families = familiesForGeneration(generation);
-  const family = families[0] ?? GAME_FAMILIES[0];
-  const context = family.contexts[0];
-  return {
-    generation,
-    familyId: family.id,
-    versionGroup: context.versionGroup,
-    version: family.versions[0].slug,
-  };
-}
-
 export function normalizePokemonGameContext(candidate: Partial<PokemonGameContext> | null | undefined): PokemonGameContext {
   const requestedGeneration = Number(candidate?.generation);
   const generation = (GENERATIONS.includes(requestedGeneration as GenerationNumber)

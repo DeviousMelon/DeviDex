@@ -1,3 +1,7 @@
+-- NOTE (v2.2): game_dex_entries, created below, was dropped in v2.2 as unused
+-- (replaced by game_dex_set_entries in v1.1). If you re-run this file, run
+-- v2.2-drop-unused-objects.sql again afterwards.
+
 -- =============================================================
 -- DeviDex v0.3 - core Living Dex database
 --
