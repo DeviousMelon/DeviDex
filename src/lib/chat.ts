@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import { cleanError, toSocialUser, type Result, type SocialUser } from './social';
+import { callRpc, cleanError, NOT_CONFIGURED, nothing, rows, type Result, type Row } from './rpc';
+import { toSocialUser, type SocialUser } from './social';
 
 // Wrappers around the v1.7/v1.8 chat functions. Reading messages uses the
 // table directly (RLS limits it to members); every write is a database function.
@@ -38,10 +39,6 @@ export interface ChatMessage {
   pokemonShiny: boolean;
 }
 
-type Row = Record<string, unknown>;
-const NOT_CONFIGURED = 'Supabase is not configured.';
-const rows = (data: unknown) => (Array.isArray(data) ? (data as Row[]) : []);
-
 export function toChatMessage(row: Row): ChatMessage {
   return {
     id: String(row.id),
@@ -56,17 +53,8 @@ export function toChatMessage(row: Row): ChatMessage {
   };
 }
 
-async function call<T>(name: string, args: Record<string, unknown> | undefined, map: (data: unknown) => T, fallback: T): Promise<Result<T>> {
-  if (!supabase) return { data: fallback, error: NOT_CONFIGURED };
-  const { data, error } = await supabase.rpc(name, args);
-  if (error) return { data: fallback, error: cleanError(error.message) };
-  return { data: map(data), error: null };
-}
-
-const nothing = () => null;
-
 export function getMyConversations() {
-  return call<ChatConversation[]>('get_my_conversations', undefined, (data) => rows(data).map((row) => ({
+  return callRpc<ChatConversation[]>('get_my_conversations', undefined, (data) => rows(data).map((row) => ({
     id: String(row.conversation_id),
     kind: row.kind as ChatConversation['kind'],
     title: (row.title as string | null) ?? null,
@@ -92,7 +80,7 @@ export function getMyConversations() {
 }
 
 export function getConversationMembers(conversationId: string) {
-  return call<ChatMember[]>('get_conversation_members', { conversation: conversationId }, (data) => rows(data).map((row) => ({
+  return callRpc<ChatMember[]>('get_conversation_members', { conversation: conversationId }, (data) => rows(data).map((row) => ({
     ...toSocialUser(row),
     role: row.role as ChatMember['role'],
     joinedAt: String(row.joined_at),
@@ -119,31 +107,31 @@ export async function fetchMessages(conversationId: string, before?: string): Pr
 }
 
 export function startDirectConversation(username: string) {
-  return call<string | null>('start_direct_conversation', { other_username: username }, (data) => (data as string) ?? null, null);
+  return callRpc<string | null>('start_direct_conversation', { other_username: username }, (data) => (data as string) ?? null, null);
 }
 
 export function createGroupConversation(title: string, usernames: string[]) {
-  return call<string | null>('create_group_conversation', { group_title: title, member_usernames: usernames }, (data) => (data as string) ?? null, null);
+  return callRpc<string | null>('create_group_conversation', { group_title: title, member_usernames: usernames }, (data) => (data as string) ?? null, null);
 }
 
 export function addGroupMembers(conversationId: string, usernames: string[]) {
-  return call('add_group_members', { conversation: conversationId, member_usernames: usernames }, nothing, null);
+  return callRpc('add_group_members', { conversation: conversationId, member_usernames: usernames }, nothing, null);
 }
 
 export function removeGroupMember(conversationId: string, userId: string) {
-  return call('remove_group_member', { conversation: conversationId, member: userId }, nothing, null);
+  return callRpc('remove_group_member', { conversation: conversationId, member: userId }, nothing, null);
 }
 
 export function renameGroup(conversationId: string, title: string) {
-  return call('rename_group', { conversation: conversationId, new_title: title }, nothing, null);
+  return callRpc('rename_group', { conversation: conversationId, new_title: title }, nothing, null);
 }
 
 export function leaveGroup(conversationId: string) {
-  return call('leave_group', { conversation: conversationId }, nothing, null);
+  return callRpc('leave_group', { conversation: conversationId }, nothing, null);
 }
 
 export function sendMessage(conversationId: string, body: string, pokemon?: { formId: number; shiny: boolean } | null) {
-  return call<ChatMessage | null>(
+  return callRpc<ChatMessage | null>(
     'send_message',
     {
       conversation: conversationId,
@@ -157,11 +145,11 @@ export function sendMessage(conversationId: string, body: string, pokemon?: { fo
 }
 
 export function deleteMessage(messageId: string) {
-  return call('delete_message', { message: messageId }, nothing, null);
+  return callRpc('delete_message', { message: messageId }, nothing, null);
 }
 
 export function markConversationRead(conversationId: string) {
-  return call('mark_conversation_read', { conversation: conversationId }, nothing, null);
+  return callRpc('mark_conversation_read', { conversation: conversationId }, nothing, null);
 }
 
 /** Ids of people you blocked, so their group-chat messages can be hidden. */
