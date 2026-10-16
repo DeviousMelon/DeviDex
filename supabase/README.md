@@ -87,3 +87,31 @@ Notes:
   functions as missing. That's expected.
 - From now on, commit any SQL you run in the dashboard here as a numbered file,
   so the repo and the live database don't drift apart again.
+
+## v2.2: reference data foundation
+
+Shared game data for the upcoming calculators, type chart and search tools:
+types and the type chart (including old-generation charts), moves, abilities,
+items, natures, egg groups, catch rates, base stats, and learnsets.
+
+1. Run `v2.2-reference-data.sql` in the SQL Editor. Safe to rerun.
+2. Run `verify-v2.2.sql`. Checks 1–9 should say `ok = true` straight away.
+3. Deploy the frontend, then on the **Admin** page press
+   **Import reference data** (a minute or two; it downloads ~15 MB from PokéAPI).
+4. Run `verify-v2.2.sql` again. Now every row should say `ok = true`.
+
+Notes:
+
+- Everything is public to read, admin-only to write, and holds no user data.
+  Re-syncing can't touch anyone's saves.
+- Pokémon detail pages still fetch PokéAPI on demand. These tables are for
+  questions across many Pokémon at once ("who can pass down Wish as an egg move?").
+- `ref_pokemon` is keyed by PokéAPI Pokémon id (10001+ are forms). Use the
+  `ref_form_pokemon` view to get from a `pokemon_forms` row to its stats/types.
+- Learnsets are folded: one row per Pokémon + move + method + level, with
+  `version_group_ids` listing every game it applies to. Filter a game with
+  `version_group_ids @> '{25}'` (or `.contains()` in supabase-js).
+- Past type charts and past typings are stored as "applied up to and including
+  `until_generation`".
+- Re-run the importer after a new game/DLC, and after re-syncing the National
+  Dex (only species already in `pokemon_species` are imported).
