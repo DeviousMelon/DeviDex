@@ -1,3 +1,6 @@
+-- NOTE (v2.2): the form_category_counts view created below was dropped in
+-- v2.2 as unused. If you re-run this file, run migrations/021_drop_unused_objects.sql again.
+
 -- =============================================================
 -- DeviDex v0.9 - Phase 4: Forms foundation
 --
