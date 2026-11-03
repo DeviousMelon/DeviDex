@@ -200,7 +200,20 @@ export async function deleteTradeItem(ctx: Context) {
 // ---------------------------------------------------------------------------
 // Health
 
+/** Says what's wrong instead of a bare 500, so a broken deploy is easy to spot. */
 export async function getHealth(ctx: Context) {
-  const row = await ctx.env.DB.prepare("SELECT count(*) AS tables FROM sqlite_master WHERE type = 'table'").first<{ tables: number }>();
-  return json({ ok: true, d1Tables: row?.tables ?? 0, signedIn: Boolean(ctx.user) });
+  const checks: Record<string, unknown> = { signedIn: Boolean(ctx.user), supabaseUrl: Boolean(ctx.env.SUPABASE_URL) };
+  if (!ctx.env.DB) return json({ ok: false, problem: 'This deploy has no D1 binding (DB).', ...checks }, 503);
+  try {
+    const row = await ctx.env.DB.prepare("SELECT count(*) AS tables FROM sqlite_master WHERE type = 'table'").first<{ tables: number }>();
+    checks.d1Tables = row?.tables ?? 0;
+  } catch (error) {
+    return json({ ok: false, problem: `D1 query failed: ${error instanceof Error ? error.message : String(error)}`, ...checks }, 503);
+  }
+  try {
+    checks.catalogForms = (await knownFormIds(ctx.env)).size;
+  } catch (error) {
+    return json({ ok: false, problem: `Static catalogue unreadable: ${error instanceof Error ? error.message : String(error)}`, ...checks }, 503);
+  }
+  return json({ ok: true, ...checks });
 }
