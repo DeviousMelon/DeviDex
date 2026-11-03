@@ -48,7 +48,7 @@ lives in `package.json` and on the git tags.
 The releases built locally as v1.3, v1.4, v1.5 and v1.5.1 changed no schema, so
 they have no migration; `checks/catalogue.sql` covers what they relied on.
 
-**Live database status:** 001 to 020 are applied. 021 and 022 have not been run yet.
+**Live database status:** 001 to 022 are applied (021 and 022 on 3 Nov 2026). The 022 reference data still needs importing from the Admin page.
 
 ## First-time setup
 
