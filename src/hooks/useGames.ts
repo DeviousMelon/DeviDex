@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { gamesById, loadGameDexSetRows, loadSetMemberRows } from '../lib/staticData';
 import type { GameDexSetSummary, GameDexScopeType, GameVersionOption } from '../types';
 
 type RawSet = {
@@ -44,38 +45,32 @@ export function useGames() {
         return;
       }
 
-      const [setsResult, membersResult] = await Promise.all([
-        supabase
-          .from('game_dex_sets')
-          .select('id, slug, name, generation, release_order, scope_type, region_label, parent_set_id, description')
-          .eq('is_active', true)
-          .order('release_order', { ascending: true }),
-        supabase
-          .from('game_dex_set_members')
-          .select(`
-            set_id,
-            game_id,
-            member_order,
-            short_label,
-            games!inner ( id, slug, name )
-          `)
-          .order('member_order', { ascending: true }),
-      ]);
-
-      if (cancelled) return;
-
-      if (setsResult.error || membersResult.error) {
-        setError(
-          setsResult.error?.message
-          ?? membersResult.error?.message
-          ?? 'Could not load shared Game Dexes.',
-        );
+      // The shared Game Dex tables are static files now (see lib/staticData.ts).
+      let setRows: RawSet[];
+      let memberRows: RawMember[];
+      try {
+        const [sets, members, games] = await Promise.all([loadGameDexSetRows(), loadSetMemberRows(), gamesById()]);
+        setRows = sets
+          .filter((row) => row.is_active !== false)
+          .sort((a, b) => a.release_order - b.release_order) as unknown as RawSet[];
+        memberRows = members
+          .slice()
+          .sort((a, b) => a.member_order - b.member_order)
+          .flatMap((row) => {
+            const game = games.get(row.game_id);
+            return game ? [{ ...row, games: { id: game.id, slug: game.slug, name: game.name } }] : [];
+          });
+      } catch (staticError) {
+        if (cancelled) return;
+        setError(staticError instanceof Error ? staticError.message : 'Could not load shared Game Dexes.');
         setLoading(false);
         return;
       }
 
+      if (cancelled) return;
+
       const membersBySet = new Map<number, GameVersionOption[]>();
-      for (const row of (membersResult.data ?? []) as unknown as RawMember[]) {
+      for (const row of memberRows) {
         const game = Array.isArray(row.games) ? row.games[0] : row.games;
         if (!game) continue;
         const list = membersBySet.get(row.set_id) ?? [];
@@ -89,7 +84,7 @@ export function useGames() {
         membersBySet.set(row.set_id, list);
       }
 
-      setGames(((setsResult.data ?? []) as RawSet[]).map((row) => ({
+      setGames(setRows.map((row) => ({
         id: row.id,
         slug: row.slug,
         name: row.name,
