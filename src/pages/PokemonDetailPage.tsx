@@ -5,6 +5,7 @@ import { EvolutionChain } from '../components/EvolutionChain';
 import { MoveLearnset } from '../components/MoveLearnset';
 import { PokemonGameContextSelector } from '../components/PokemonGameContext';
 import { PokemonSprite } from '../components/PokemonSprite';
+import { PokemonToolLinks, TypeMatchupsPanel } from '../components/tools/PokemonToolPanels';
 import { useDexCatalog } from '../hooks/useDexCatalog';
 import {
   gameContextStorageKey,
@@ -614,6 +615,18 @@ export function PokemonDetailPage() {
             ))}
           </dl>
         </section>
+      </div>
+
+      <div className="pokemon-grid pokemon-grid--tools">
+        {contextTypes.length > 0 && (
+          <TypeMatchupsPanel typeSlugs={contextTypes.map(({ type }) => type.name)} generation={gameContext.generation} />
+        )}
+        <PokemonToolLinks
+          formSlug={selectedForm.slug}
+          generation={gameContext.generation}
+          versionGroup={gameContext.versionGroup}
+          breedingSupported={breeding}
+        />
       </div>
 
       {evolutionLoading && (

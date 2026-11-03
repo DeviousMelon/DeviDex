@@ -1,5 +1,6 @@
 import { AdminBankList } from '../components/AdminBankList';
 import { AdminDataTools } from '../components/AdminDataTools';
+import { AdminReferenceData } from '../components/AdminReferenceData';
 import { AdminReports } from '../components/AdminReports';
 import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +21,7 @@ export function AdminPage() {
       <AdminReports />
       <AdminBankList />
       <AdminDataTools />
+      <AdminReferenceData />
     </main>
   );
 }

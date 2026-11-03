@@ -11,6 +11,7 @@ import './social.css';
 import './theme.css';
 import './pokemon.css';
 import './bank.css';
+import './tools.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Could not find the #root element. Check index.html.');

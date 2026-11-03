@@ -21,6 +21,12 @@ import { ForumsPage } from './pages/ForumsPage';
 import { ForumPostPage } from './pages/ForumPostPage';
 import { NewForumPostPage } from './pages/NewForumPostPage';
 import { BankPage } from './pages/BankPage';
+import { ToolsPage } from './pages/tools/ToolsPage';
+import { CatchPage } from './pages/tools/CatchPage';
+import { BreedingPage } from './pages/tools/BreedingPage';
+import { TypesPage } from './pages/tools/TypesPage';
+import { DamagePage } from './pages/tools/DamagePage';
+import { MovesPage } from './pages/tools/MovesPage';
 
 function LegacyCollectionsRedirect() {
   const location = useLocation();
@@ -46,6 +52,14 @@ function App() {
 
         {/* v2.0: Pokémon Bank shutdown prep. Public; checklist and plans need an account. */}
         <Route path="/bank" element={<BankPage />} />
+
+        {/* v2.2: calculators and lookups, built on the reference data. All public. */}
+        <Route path="/tools" element={<ToolsPage />} />
+        <Route path="/tools/catch" element={<CatchPage />} />
+        <Route path="/tools/breeding" element={<BreedingPage />} />
+        <Route path="/tools/types" element={<TypesPage />} />
+        <Route path="/tools/damage" element={<DamagePage />} />
+        <Route path="/tools/moves" element={<MovesPage />} />
 
         {/* Public user pages. */}
         <Route path="/u/:username" element={<PublicProfilePage />} />

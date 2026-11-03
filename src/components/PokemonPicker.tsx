@@ -8,12 +8,14 @@ type PokemonPickerProps = {
   confirmLabel?: string;
   onPick: (pick: { formId: number; shiny: boolean }) => void;
   onClose: () => void;
+  /** Hide the shiny toggle where shininess doesn't matter (calculators). */
+  allowShiny?: boolean;
 };
 
 const MAX_RESULTS = 60;
 
 /** Search-and-pick dialog for any trackable Pokémon form, normal or shiny. */
-export function PokemonPicker({ open, title, confirmLabel = 'Choose', onPick, onClose }: PokemonPickerProps) {
+export function PokemonPicker({ open, title, confirmLabel = 'Choose', onPick, onClose, allowShiny = true }: PokemonPickerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const { catalog, error, loading } = usePokemonCatalog();
@@ -61,10 +63,12 @@ export function PokemonPicker({ open, title, confirmLabel = 'Choose', onPick, on
             placeholder="Search by name or Dex number"
             aria-label="Search Pokémon"
           />
-          <label className="picker-shiny">
-            <input type="checkbox" checked={shiny} onChange={(event) => setShiny(event.target.checked)} />
-            ✦ Shiny
-          </label>
+          {allowShiny && (
+            <label className="picker-shiny">
+              <input type="checkbox" checked={shiny} onChange={(event) => setShiny(event.target.checked)} />
+              ✦ Shiny
+            </label>
+          )}
         </div>
 
         {loading && <p className="muted">Loading Pokémon…</p>}
