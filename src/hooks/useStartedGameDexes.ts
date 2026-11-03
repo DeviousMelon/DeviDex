@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
 import { useGuestProgress } from '../context/GuestProgressContext';
 import { supabase } from '../lib/supabase';
+import { formsById, loadAvailabilityRows, loadGameDexSetRows, loadGameRows, loadSetEntryRows } from '../lib/staticData';
 import type { FormCategory, StartedGameDex } from '../types';
 
 type RawActivity = { set_id: number; game_id: number; last_activity_at: string };
@@ -43,12 +44,29 @@ export function useStartedGameDexes() {
       if (activities.length === 0) { if (!cancelled) { setStartedGames([]); setLoading(false); } return; }
       const setIds = [...new Set(activities.map((a) => a.set_id))];
       const gameIds = [...new Set(activities.map((a) => a.game_id))];
-      const [setsResult, gamesResult, entriesResult] = await Promise.all([
-        supabase.from('game_dex_sets').select('id, slug, name, generation, release_order, scope_type').in('id', setIds),
-        supabase.from('games').select('id, slug, name').in('id', gameIds),
-        supabase.from('game_dex_set_entries').select('set_id, species_id').in('set_id', setIds),
-      ]);
-      if (setsResult.error || gamesResult.error || entriesResult.error) { console.error(setsResult.error?.message ?? gamesResult.error?.message ?? entriesResult.error?.message); setLoading(false); return; }
+      // The shared Game Dex tables are static files now (see lib/staticData.ts).
+      let staticRows: [RawSet[], RawGame[], RawEntry[], RawAvailability[]];
+      try {
+        const setIdSet = new Set(setIds);
+        const gameIdSet = new Set(gameIds);
+        const [sets, games, entries, availability, forms] = await Promise.all([
+          loadGameDexSetRows(), loadGameRows(), loadSetEntryRows(), loadAvailabilityRows(), formsById(),
+        ]);
+        staticRows = [
+          sets.filter((row) => setIdSet.has(row.id)) as unknown as RawSet[],
+          games.filter((row) => gameIdSet.has(row.id)) as unknown as RawGame[],
+          entries.filter((row) => setIdSet.has(row.set_id)) as unknown as RawEntry[],
+          availability.filter((row) => gameIdSet.has(row.game_id)).flatMap((row) => {
+            const form = forms.get(row.form_id);
+            return form ? [{ game_id: row.game_id, form_id: row.form_id, pokemon_forms: { species_id: form.species_id, form_category: form.form_category } }] : [];
+          }) as unknown as RawAvailability[],
+        ];
+      } catch (staticError) {
+        console.error(staticError instanceof Error ? staticError.message : staticError);
+        setLoading(false);
+        return;
+      }
+      const [setRows, gameRows, entryRows, availabilityRows] = staticRows;
 
       let progressRows: RawProgress[] = [];
       let formProgressRows: RawFormProgress[] = [];
@@ -67,23 +85,10 @@ export function useStartedGameDexes() {
         }
       }
 
-      const availabilityRows: RawAvailability[] = [];
-      for (let from = 0; ; from += 500) {
-        const { data, error } = await supabase
-          .from('game_form_availability')
-          .select('game_id, form_id, pokemon_forms!inner(species_id, form_category)')
-          .in('game_id', gameIds)
-          .range(from, from + 499);
-        if (error) { console.error(error.message); setLoading(false); return; }
-        const page = (data ?? []) as unknown as RawAvailability[];
-        availabilityRows.push(...page);
-        if (page.length < 500) break;
-      }
-
-      const setById = new Map(((setsResult.data ?? []) as RawSet[]).map((s) => [s.id, s]));
-      const gameById = new Map(((gamesResult.data ?? []) as RawGame[]).map((g) => [g.id, g]));
+      const setById = new Map(setRows.map((s) => [s.id, s]));
+      const gameById = new Map(gameRows.map((g) => [g.id, g]));
       const speciesBySet = new Map<number, Set<number>>();
-      for (const row of (entriesResult.data ?? []) as RawEntry[]) {
+      for (const row of entryRows) {
         const species = speciesBySet.get(row.set_id) ?? new Set<number>();
         species.add(row.species_id);
         speciesBySet.set(row.set_id, species);

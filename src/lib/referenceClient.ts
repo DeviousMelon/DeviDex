@@ -1,23 +1,17 @@
 // Reads the v2.2 reference tables for the Tools pages and Pokémon pages.
 // Small tables are cached for the whole browser session; per-Pokémon and
 // per-move lookups are fetched when needed.
-import { supabase } from './supabase';
+import { learnsetRowsForMove, learnsetRowsForPokemon, loadRefTable } from './staticData';
 import { buildTypeChart, type ChartType, type EfficacyRow, type PastEfficacyRow, type TypeChart } from './typeChart';
 import type { RefMove, RefNature, RefPokemon, RefSpecies, RefVersionGroup, RefEggGroup } from './referenceData';
 
-const PAGE = 1000;
-
-async function readAll<T>(table: string, columns = '*', order = 'id'): Promise<T[]> {
-  if (!supabase) throw new Error('DeviDex isn’t connected to its database.');
-  const rows: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase.from(table).select(columns).order(order).range(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    const page = (data ?? []) as unknown as T[];
-    rows.push(...page);
-    if (page.length < PAGE) break;
-  }
-  return rows;
+// The reference tables are static files now (see lib/staticData.ts). The
+// export writes each one already sorted by its key, so `order` is only a
+// safety net for the few callers that rely on it.
+async function readAll<T>(table: string, _columns = '*', order = 'id'): Promise<T[]> {
+  const rows = await loadRefTable<T>(table);
+  const key = order as keyof T;
+  return rows.slice().sort((a, b) => Number(a[key]) - Number(b[key]));
 }
 
 /** One cached promise per key; a failure clears it so the next call retries. */
@@ -111,36 +105,16 @@ export type LearnsetRow = { pokemon_id: number; move_id: number; learn_method: s
 
 /** Who learns a move, optionally only in one version group and by one method. */
 export async function whoLearns(moveId: number, versionGroupId?: number, method?: string): Promise<LearnsetRow[]> {
-  if (!supabase) throw new Error('DeviDex isn’t connected to its database.');
-  const rows: LearnsetRow[] = [];
-  for (let from = 0; ; from += PAGE) {
-    let query = supabase
-      .from('ref_pokemon_moves')
-      .select('pokemon_id, move_id, learn_method, level, version_group_ids')
-      .eq('move_id', moveId);
-    if (versionGroupId != null) query = query.contains('version_group_ids', [versionGroupId]);
-    if (method) query = query.eq('learn_method', method);
-    const { data, error } = await query.order('pokemon_id').range(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    const page = (data ?? []) as LearnsetRow[];
-    rows.push(...page);
-    if (page.length < PAGE) break;
-  }
-  return rows;
+  const rows = await learnsetRowsForMove(moveId);
+  return rows
+    .filter((row) => (versionGroupId == null || row.version_group_ids.includes(versionGroupId)) && (!method || row.learn_method === method))
+    .sort((x, y) => x.pokemon_id - y.pokemon_id);
 }
 
 /** One Pokémon's learnset in one version group (optionally one method). */
 export async function learnsetFor(pokemonId: number, versionGroupId: number, method?: string): Promise<LearnsetRow[]> {
-  if (!supabase) throw new Error('DeviDex isn’t connected to its database.');
-  let query = supabase
-    .from('ref_pokemon_moves')
-    .select('pokemon_id, move_id, learn_method, level, version_group_ids')
-    .eq('pokemon_id', pokemonId)
-    .contains('version_group_ids', [versionGroupId]);
-  if (method) query = query.eq('learn_method', method);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return (data ?? []) as LearnsetRow[];
+  const rows = await learnsetRowsForPokemon(pokemonId);
+  return rows.filter((row) => row.version_group_ids.includes(versionGroupId) && (!method || row.learn_method === method));
 }
 
 export type PastTyping = { pokemon_id: number; until_generation: number; type1_id: number; type2_id: number | null };

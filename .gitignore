@@ -1,5 +1,5 @@
 # Installed dependencies are recreated with `npm install`.
-node_modules/
+node_modules
 
 # Production build output.
 dist/
@@ -23,3 +23,8 @@ Desktop.ini
 
 # Cloudflare Wrangler local state
 .wrangler/
+
+# Static data exported from Supabase at build time (scripts/export-static-data.mjs).
+# Generated on every build until the move finishes; then it gets committed.
+public/data/
+public/.data-export-*/

@@ -33,6 +33,7 @@ import {
   type PokemonSpeciesDetail,
 } from '../lib/pokeapi';
 import { supabase } from '../lib/supabase';
+import { loadFormRows, loadSpeciesRows } from '../lib/staticData';
 import type { DexCatalogEntry, FormCategory } from '../types';
 
 type LocalSpecies = {
@@ -202,61 +203,40 @@ export function PokemonDetailPage() {
       setPreviousSpecies(null);
       setNextSpecies(null);
 
-      const { data: speciesRow, error: speciesError } = await supabase
-        .from('pokemon_species')
-        .select('id, national_dex_number, name, slug, generation, is_legendary, is_mythical')
-        .eq('slug', speciesSlug)
-        .maybeSingle();
-
-      if (cancelled) return;
-      if (speciesError) {
-        setError(speciesError.message);
+      // The catalogue is a static file now (see lib/staticData.ts).
+      let allSpecies: Awaited<ReturnType<typeof loadSpeciesRows>>;
+      let allForms: Awaited<ReturnType<typeof loadFormRows>>;
+      try {
+        [allSpecies, allForms] = await Promise.all([loadSpeciesRows(), loadFormRows()]);
+      } catch (catalogError) {
+        if (cancelled) return;
+        setError(catalogError instanceof Error ? catalogError.message : 'Couldn’t load the Pokémon catalogue.');
         setLoading(false);
         return;
       }
+
+      if (cancelled) return;
+      const speciesRow = allSpecies.find((row) => row.slug === speciesSlug);
       if (!speciesRow) {
         setError('That Pokémon is not in the DeviDex catalogue.');
         setLoading(false);
         return;
       }
 
-      const localSpecies = speciesRow as LocalSpecies;
+      const localSpecies = speciesRow as unknown as LocalSpecies;
       setSpecies(localSpecies);
 
-      const [formsResult, previousResult, nextResult] = await Promise.all([
-        supabase
-          .from('pokemon_forms')
-          .select('id, slug, name, is_default, is_trackable, form_category, source_pokemon_id, is_battle_only, supports_placeholder, sprite_url, shiny_sprite_url, form_order')
-          .eq('species_id', localSpecies.id)
-          .eq('is_trackable', true)
-          .order('form_order', { ascending: true }),
-        supabase
-          .from('pokemon_species')
-          .select('slug, name, national_dex_number')
-          .lt('national_dex_number', localSpecies.national_dex_number)
-          .order('national_dex_number', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('pokemon_species')
-          .select('slug, name, national_dex_number')
-          .gt('national_dex_number', localSpecies.national_dex_number)
-          .order('national_dex_number', { ascending: true })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+      const byDex = allSpecies.slice().sort((x, y) => x.national_dex_number - y.national_dex_number);
+      const previous = [...byDex].reverse().find((row) => row.national_dex_number < localSpecies.national_dex_number);
+      const next = byDex.find((row) => row.national_dex_number > localSpecies.national_dex_number);
+      const neighbour = (row: typeof previous) => (row ? { slug: row.slug, name: row.name, national_dex_number: row.national_dex_number } : null);
 
-      if (cancelled) return;
-      if (formsResult.error) {
-        setError(formsResult.error.message);
-        setLoading(false);
-        return;
-      }
-
-      const formRows = (formsResult.data ?? []) as LocalForm[];
+      const formRows = allForms
+        .filter((form) => form.species_id === localSpecies.id && form.is_trackable)
+        .sort((x, y) => x.form_order - y.form_order) as unknown as LocalForm[];
       setForms(formRows);
-      setPreviousSpecies((previousResult.data as NeighborSpecies | null) ?? null);
-      setNextSpecies((nextResult.data as NeighborSpecies | null) ?? null);
+      setPreviousSpecies(neighbour(previous) as NeighborSpecies | null);
+      setNextSpecies(neighbour(next) as NeighborSpecies | null);
       setLoading(false);
     }
 

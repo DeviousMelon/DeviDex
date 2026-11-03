@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { loadGameRows } from './staticData';
 import type { CollectionGoal, CollectionPresetId, UserProfile } from '../types';
 
 const BACKUP_FORMAT = 'devidex-backup';
@@ -530,9 +531,9 @@ export async function listProgressGames(userId: string): Promise<ProgressGame[]>
   if (error) throw new Error(error.message);
   const ids = [...new Set((activity ?? []).map((row) => row.game_id as number))];
   if (!ids.length) return [];
-  const { data: games, error: gamesError } = await supabase.from('games').select('id, name, release_order').in('id', ids).order('release_order');
-  if (gamesError) throw new Error(gamesError.message);
-  return (games ?? []).map((game) => ({ id: game.id as number, name: game.name as string }));
+  const wanted = new Set(ids);
+  const games = (await loadGameRows()).filter((game) => wanted.has(game.id)).sort((a, b) => a.release_order - b.release_order);
+  return games.map((game) => ({ id: game.id, name: game.name }));
 }
 
 /**

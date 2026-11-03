@@ -3,6 +3,16 @@ import { useAuth } from '../context/AuthContext';
 import { useFormPreferences } from '../context/FormPreferencesContext';
 import { useGuestProgress } from '../context/GuestProgressContext';
 import { supabase } from '../lib/supabase';
+import {
+  formsById,
+  gamesById,
+  loadAvailabilityRows,
+  loadExclusiveRows,
+  loadGameDexSetRows,
+  loadSetEntryRows,
+  loadSetMemberRows,
+  speciesById,
+} from '../lib/staticData';
 import { useOrderedSaves } from '../lib/orderedSaves';
 import { clearProgressRow } from '../lib/progressRows';
 import type {
@@ -108,45 +118,61 @@ export function useGameDex(setSlug: string | undefined, preferredGameSlug?: stri
     setError(null);
 
     let resolvedPreferredGameSlug = preferredGameSlug ?? null;
-    let { data: setData, error: dbSetError } = await supabase
-      .from('game_dex_sets')
-      .select('id, slug, name, generation, release_order, scope_type, region_label, parent_set_id, description')
-      .eq('slug', setSlug)
-      .maybeSingle();
 
-    // Keep every old /games/scarlet-style bookmark alive after the shared-Dex
-    // rebuild. The matching version is selected when possible.
-    if (!setData && !dbSetError) {
-      const { data: legacyGame } = await supabase.from('games').select('id').eq('slug', setSlug).maybeSingle();
-      if (legacyGame) {
-        resolvedPreferredGameSlug = resolvedPreferredGameSlug ?? setSlug;
-        const { data: memberships } = await supabase
-          .from('game_dex_set_members')
-          .select('set_id, game_dex_sets!inner(id, slug, name, generation, release_order, scope_type, region_label, parent_set_id, description)')
-          .eq('game_id', legacyGame.id);
-        const base = (memberships ?? [])
-          .map((row: any) => Array.isArray(row.game_dex_sets) ? row.game_dex_sets[0] : row.game_dex_sets)
-          .filter(Boolean)
-          .sort((a: any, b: any) => (a.scope_type === 'base' ? -1 : 1) - (b.scope_type === 'base' ? -1 : 1))[0];
-        setData = base ?? null;
-      }
-    }
-
-    if (dbSetError || !setData) {
-      setError(dbSetError?.message ?? 'That shared Game Dex does not exist in DeviDex.');
+    // The shared Game Dex tables are static files now (see lib/staticData.ts).
+    let sets: Awaited<ReturnType<typeof loadGameDexSetRows>>;
+    let games: Awaited<ReturnType<typeof gamesById>>;
+    let species: Awaited<ReturnType<typeof speciesById>>;
+    let members: Awaited<ReturnType<typeof loadSetMemberRows>>;
+    let entries: Awaited<ReturnType<typeof loadSetEntryRows>>;
+    let exclusives: Awaited<ReturnType<typeof loadExclusiveRows>>;
+    try {
+      [sets, games, species, members, entries, exclusives] = await Promise.all([
+        loadGameDexSetRows(),
+        gamesById(),
+        speciesById(),
+        loadSetMemberRows(),
+        loadSetEntryRows(),
+        loadExclusiveRows(),
+      ]);
+    } catch (staticError) {
+      setError(staticError instanceof Error ? staticError.message : 'Couldn’t load the Game Dex data.');
       setLoading(false);
       return;
     }
 
-    const rawSet = setData as RawSet;
-    const { data: memberData, error: memberError } = await supabase
-      .from('game_dex_set_members')
-      .select('game_id, member_order, short_label, games!inner(id, slug, name)')
-      .eq('set_id', rawSet.id)
-      .order('member_order', { ascending: true });
-    if (memberError) { setError(memberError.message); setLoading(false); return; }
+    let setData: RawSet | null = (sets.find((row) => row.slug === setSlug) as RawSet | undefined) ?? null;
 
-    const memberOptions: GameVersionOption[] = ((memberData ?? []) as unknown as RawMember[]).flatMap((row) => {
+    // Keep every old /games/scarlet-style bookmark alive after the shared-Dex
+    // rebuild. The matching version is selected when possible.
+    if (!setData) {
+      const legacyGame = [...games.values()].find((row) => row.slug === setSlug);
+      if (legacyGame) {
+        resolvedPreferredGameSlug = resolvedPreferredGameSlug ?? setSlug;
+        const memberSetIds = new Set(members.filter((row) => row.game_id === legacyGame.id).map((row) => row.set_id));
+        const base = sets
+          .filter((row) => memberSetIds.has(row.id))
+          .sort((a, b) => (a.scope_type === 'base' ? -1 : 1) - (b.scope_type === 'base' ? -1 : 1))[0];
+        setData = (base as RawSet | undefined) ?? null;
+      }
+    }
+
+    if (!setData) {
+      setError('That shared Game Dex does not exist in DeviDex.');
+      setLoading(false);
+      return;
+    }
+
+    const rawSet = setData;
+    const memberData: RawMember[] = members
+      .filter((row) => row.set_id === rawSet.id)
+      .sort((a, b) => a.member_order - b.member_order)
+      .flatMap((row) => {
+        const g = games.get(row.game_id);
+        return g ? [{ game_id: row.game_id, member_order: row.member_order, short_label: row.short_label, games: { id: g.id, slug: g.slug, name: g.name } }] : [];
+      });
+
+    const memberOptions: GameVersionOption[] = memberData.flatMap((row) => {
       const g = Array.isArray(row.games) ? row.games[0] : row.games;
       return g ? [{ id: g.id, slug: g.slug, name: g.name, shortLabel: row.short_label || g.name, memberOrder: row.member_order }] : [];
     });
@@ -167,28 +193,17 @@ export function useGameDex(setSlug: string | undefined, preferredGameSlug?: stri
       versions: memberOptions,
     });
 
-    const allRows: RawEntry[] = [];
-    for (let from = 0; ; from += PAGE_SIZE) {
-      const { data, error: entryError } = await supabase
-        .from('game_dex_set_entries')
-        .select('set_id, species_id, dex_number, dex_slug, dex_name, dex_order, pokemon_species!inner(id, national_dex_number, name, slug)')
-        .eq('set_id', rawSet.id)
-        .order('dex_order', { ascending: true })
-        .order('dex_number', { ascending: true })
-        .range(from, from + PAGE_SIZE - 1);
-      if (entryError) { setError(entryError.message); setLoading(false); return; }
-      const page = (data ?? []) as unknown as RawEntry[];
-      allRows.push(...page);
-      if (page.length < PAGE_SIZE) break;
-    }
+    // Same order the old query asked for: dex_order, then dex_number.
+    const allRows: RawEntry[] = entries
+      .filter((row) => row.set_id === rawSet.id)
+      .sort((a, b) => a.dex_order - b.dex_order || (a.dex_number ?? 0) - (b.dex_number ?? 0))
+      .flatMap((row) => {
+        const s = species.get(row.species_id);
+        return s ? [{ ...row, pokemon_species: { id: s.id, national_dex_number: s.national_dex_number, name: s.name, slug: s.slug } }] : [];
+      });
 
-    const { data: exclusiveData, error: exclusiveError } = await supabase
-      .from('game_dex_version_exclusives')
-      .select('species_id, game_id')
-      .eq('set_id', rawSet.id);
-    if (exclusiveError) { setError(exclusiveError.message); setLoading(false); return; }
     const exclusiveBySpecies = new Map<number, number[]>();
-    for (const row of (exclusiveData ?? []) as RawExclusive[]) {
+    for (const row of exclusives.filter((item) => item.set_id === rawSet.id) as RawExclusive[]) {
       const list = exclusiveBySpecies.get(row.species_id) ?? [];
       list.push(row.game_id);
       exclusiveBySpecies.set(row.species_id, list);
@@ -226,17 +241,19 @@ export function useGameDex(setSlug: string | undefined, preferredGameSlug?: stri
 
     let availableForms: Array<{ entry: GameDexCatalogEntry; formOrder: number }> = [];
     if (selected) {
-      const formRows: RawAvailableForm[] = [];
-      for (let from = 0; ; from += PAGE_SIZE) {
-        const { data, error: formError } = await supabase
-          .from('game_form_availability')
-          .select('form_id, pokemon_forms!inner(id, species_id, name, slug, form_category, form_order, is_battle_only, supports_placeholder, sprite_url, shiny_sprite_url)')
-          .eq('game_id', selected.id)
-          .range(from, from + PAGE_SIZE - 1);
-        if (formError) { setError(formError.message); setLoading(false); return; }
-        const page = (data ?? []) as unknown as RawAvailableForm[];
-        formRows.push(...page);
-        if (page.length < PAGE_SIZE) break;
+      let formRows: RawAvailableForm[];
+      try {
+        const [availability, forms] = await Promise.all([loadAvailabilityRows(), formsById()]);
+        formRows = availability
+          .filter((row) => row.game_id === selected.id)
+          .flatMap((row) => {
+            const form = forms.get(row.form_id);
+            return form ? [{ form_id: row.form_id, pokemon_forms: form as unknown as RawAvailableForm['pokemon_forms'] }] : [];
+          });
+      } catch (formError) {
+        setError(formError instanceof Error ? formError.message : 'Couldn’t load this game’s forms.');
+        setLoading(false);
+        return;
       }
 
       availableForms = formRows.flatMap((row) => {

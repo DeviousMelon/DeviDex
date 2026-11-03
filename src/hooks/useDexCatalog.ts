@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { trackableFormsWithSpecies } from '../lib/staticData';
 import { useOrderedSaves } from '../lib/orderedSaves';
 import { clearProgressRow } from '../lib/progressRows';
 import { useAuth } from '../context/AuthContext';
@@ -64,47 +65,17 @@ export function useDexCatalog() {
     setLoading(true);
     setError(null);
 
-    // PostgREST caps ordinary responses, and a full form catalogue comfortably
-    // exceeds 1,000 rows. Keep paging forever rather than rediscovering that
-    // limit every time Game Freak invents another hat.
+    // Progress rows still come from the database, which caps each response.
     const PAGE_SIZE = 500;
-    const allCatalogRows: RawCatalogRow[] = [];
 
-    for (let from = 0; ; from += PAGE_SIZE) {
-      const to = from + PAGE_SIZE - 1;
-      const { data, error: catalogError } = await supabase
-        .from('pokemon_forms')
-        .select(`
-          id,
-          name,
-          slug,
-          is_default,
-          form_category,
-          is_battle_only,
-          supports_placeholder,
-          sprite_url,
-          shiny_sprite_url,
-          pokemon_species!inner (
-            id,
-            national_dex_number,
-            name,
-            slug,
-            generation
-          )
-        `)
-        .eq('is_trackable', true)
-        .order('form_order', { ascending: true })
-        .range(from, to);
-
-      if (catalogError) {
-        setError(catalogError.message);
-        setLoading(false);
-        return;
-      }
-
-      const page = (data ?? []) as unknown as RawCatalogRow[];
-      allCatalogRows.push(...page);
-      if (page.length < PAGE_SIZE) break;
+    // The catalogue is a static file now (see lib/staticData.ts).
+    let allCatalogRows: RawCatalogRow[];
+    try {
+      allCatalogRows = (await trackableFormsWithSpecies()) as unknown as RawCatalogRow[];
+    } catch (catalogError) {
+      setError(catalogError instanceof Error ? catalogError.message : 'Couldn’t load the Pokémon catalogue.');
+      setLoading(false);
+      return;
     }
 
     const normalized = allCatalogRows.map((row) => {

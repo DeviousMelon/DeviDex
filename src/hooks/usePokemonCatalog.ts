@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { trackableFormsWithSpecies } from '../lib/staticData';
 import type { DexCatalogEntry, FormCategory } from '../types';
 
 type RawRow = {
@@ -27,27 +27,8 @@ export interface PokemonCatalog {
 let cached: Promise<PokemonCatalog> | null = null;
 
 async function fetchCatalog(): Promise<PokemonCatalog> {
-  if (!supabase) return { entries: [], byFormId: new Map() };
-
-  const PAGE_SIZE = 500;
-  const rows: RawRow[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from('pokemon_forms')
-      .select(`
-        id, name, slug, is_default, form_category, is_battle_only, supports_placeholder,
-        sprite_url, shiny_sprite_url,
-        pokemon_species!inner ( id, national_dex_number, name, slug, generation )
-      `)
-      .eq('is_trackable', true)
-      .order('form_order', { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (error) throw new Error(error.message);
-    const page = (data ?? []) as unknown as RawRow[];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
-  }
+  // The catalogue is a static file now (see lib/staticData.ts).
+  const rows = (await trackableFormsWithSpecies()) as unknown as RawRow[];
 
   const entries = rows
     .map((row) => {
