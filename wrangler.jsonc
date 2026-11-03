@@ -31,8 +31,20 @@
   "vars": {
     "SUPABASE_URL": "https://vzbsgmhheuskpxjixfco.supabase.co"
   },
-  // Branch/PR builds run `npx wrangler preview`, which refuses to run
-  // without this block. Empty = previews use the same settings as above;
-  // production only ever reads the top-level settings.
-  "previews": {}
+  // Branch/PR builds run `npx wrangler preview`. Previews inherit NONE of the
+  // bindings or vars above, so each one is repeated here, pointing at a
+  // separate staging database so a preview can never touch real user data.
+  // Production only ever reads the top-level settings.
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "devidex-preview",
+        "database_id": "54c3de93-169a-4f90-a69c-166a745e629a"
+      }
+    ],
+    "vars": {
+      "SUPABASE_URL": "https://vzbsgmhheuskpxjixfco.supabase.co"
+    }
+  }
 }

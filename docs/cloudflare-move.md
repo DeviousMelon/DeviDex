@@ -8,7 +8,7 @@ logins on Supabase Auth for now.
 | Piece | Status |
 | --- | --- |
 | Shared data (catalogue + reference tables) as static files | Done. Exported at build time into `/data`; the site reads it from there. |
-| D1 schema for user data | Done. Applied to the `devidex` D1 database (Western Europe). |
+| D1 schema for user data | Done. Applied to `devidex` (production) and `devidex-preview` (branch builds), both in Western Europe. |
 | Worker API: logins, permission checks, first routes | Done. `/api/health`, `/api/me`, `/api/profiles/:username`, `/api/collection`, `/api/trade-list`. |
 | Copy script, Supabase → D1 | Done. `scripts/copy-supabase-to-d1.mjs`. Not run against real data yet. |
 | The rest of the API (see below) | Not started. |
@@ -99,9 +99,11 @@ would roll everyone back to Supabase's copy.
 - **Free plan limits.** D1 allows 100,000 row writes a day. Normal use is far
   below that, but never import the learnsets into D1: they're static files for
   exactly this reason.
-- **Preview builds share the production D1 database** (the `previews` block in
-  `wrangler.jsonc` is empty). Fine while D1 is unused; give previews their own
-  database before cutover.
+- **Preview builds use their own D1 database**, `devidex-preview`, with the
+  same schema. Previews inherit none of the production bindings, so anything
+  added to the top level of `wrangler.jsonc` must be added to `previews` too.
+  Apply new migrations to both databases.
 - **Migrations.** Add new files to `d1/migrations` and apply them with
-  `npx wrangler d1 migrations apply devidex --remote`. `0001` is already
-  applied and recorded in `d1_migrations`.
+  `npx wrangler d1 migrations apply devidex --remote`, and the same for
+  `devidex-preview`. `0001` is already applied to both and recorded in
+  `d1_migrations`.
