@@ -1,15 +1,35 @@
 // Cloudflare Workers deploy settings for DeviDex.
-// "single-page-application" serves index.html for routes like /friends or
-// /chat/abc, so React Router can handle them. This replaces public/_redirects,
-// which Workers rejects as an infinite loop alongside this setting.
-// Cloudflare Pages does the same automatically when there is no 404.html.
+//
+// Static site: "single-page-application" serves index.html for routes like
+// /friends or /chat/abc, so React Router can handle them. This replaces
+// public/_redirects, which Workers rejects as an infinite loop alongside this
+// setting.
+//
+// API: only /api/* runs the Worker code in worker/index.ts. Every other path,
+// including the /data JSON files, is served straight from ./dist without
+// starting the Worker, so it costs nothing against the request limits.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "devidex-cloudflare",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-06",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // User data. Logins stay on Supabase Auth for now (see docs/cloudflare-move.md).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "devidex",
+      "database_id": "77c5568e-ce81-4ece-a060-14dffd90a107",
+      "migrations_dir": "d1/migrations"
+    }
+  ],
+  "vars": {
+    "SUPABASE_URL": "https://vzbsgmhheuskpxjixfco.supabase.co"
   },
   // Branch/PR builds run `npx wrangler preview`, which refuses to run
   // without this block. Empty = previews use the same settings as above;
